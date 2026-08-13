@@ -13,16 +13,20 @@
     <p>Prends ton rendez-vous en quelques secondes</p>
   </header>
 
-  <div class="steps">
-    <div class="dot" data-step="1"></div>
-    <div class="dot" data-step="2"></div>
-    <div class="dot" data-step="3"></div>
-    <div class="dot" data-step="4"></div>
-  </div>
+  <div class="steps" id="steps-dots"></div>
+
+  <!-- Étape 0 (si plus d'un(e) employé(e)) : choix de la spécialiste -->
+  <section id="step-employee" class="card hidden">
+    <h2 class="section-title" id="employee-title">Choisis ta ou ton spécialiste</h2>
+    <div id="employee-list" class="service-list">
+      <p class="empty-note">Chargement…</p>
+    </div>
+  </section>
 
   <!-- Étape 1 : choix du service -->
-  <section id="step-service" class="card">
-    <h2 class="section-title">1. Choisis ton service</h2>
+  <section id="step-service" class="card hidden">
+    <button class="back-link hidden" data-back="employee">&larr; Changer de spécialiste</button>
+    <h2 class="section-title" id="service-title">Choisis ton service</h2>
     <div id="service-list" class="service-list">
       <p class="empty-note">Chargement des services…</p>
     </div>
@@ -31,7 +35,7 @@
   <!-- Étape 2 : choix de la date et de l'heure -->
   <section id="step-time" class="card hidden">
     <button class="back-link" data-back="service">&larr; Changer de service</button>
-    <h2 class="section-title" id="time-title">2. Choisis une date et une heure</h2>
+    <h2 class="section-title" id="time-title">Choisis une date et une heure</h2>
 
     <label for="date-input">Date</label>
     <input type="date" id="date-input" />
@@ -45,7 +49,7 @@
   <!-- Étape 3 : coordonnées -->
   <section id="step-info" class="card hidden">
     <button class="back-link" data-back="time">&larr; Changer l'heure</button>
-    <h2 class="section-title">3. Tes coordonnées</h2>
+    <h2 class="section-title">Tes coordonnées</h2>
 
     <div class="recap" id="recap-box"></div>
 

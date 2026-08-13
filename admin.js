@@ -16,6 +16,17 @@ const sb = createClient(
     fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche'
   };
 
+  // État global : rôle de la personne connectée + son équipe. Rempli par
+  // loadTeamAndRole() juste après la connexion.
+  const state = {
+    currentUser: null,
+    isOwner: false,
+    myEmployee: null,
+    employees: [],       // toute l'équipe (RLS: tout le monde voit les actif·ve·s)
+    services: [],
+    apptView: 'list'
+  };
+
   function escapeHtml(str) {
     const d = document.createElement('div');
     d.textContent = str ?? '';
@@ -43,8 +54,63 @@ const sb = createClient(
   }
 
   // ------------------------------------------------------------------
+  // Heures (jsonb {mon:{closed,open,close}, ...}) — utilisé pour l'horaire
+  // général du commerce, "Mon horaire" et l'horaire de chaque employé(e)
+  // dans l'onglet Équipe.
+  // ------------------------------------------------------------------
+  function buildHoursRows(container, hoursObj) {
+    container.innerHTML = '';
+    DAY_KEYS.forEach((day) => {
+      const h = (hoursObj && hoursObj[day]) || { closed: true, open: '09:00', close: '17:00' };
+      const row = document.createElement('div');
+      row.className = 'day-row';
+      row.dataset.day = day;
+      row.innerHTML = `
+        <div class="day-name">${DAY_LABELS[day]}</div>
+        <label class="day-closed-toggle">
+          <input type="checkbox" class="f-closed" ${h.closed ? 'checked' : ''} />
+          Fermé
+        </label>
+        <div class="day-times" style="${h.closed ? 'opacity:.4' : ''}">
+          <input type="time" class="f-open" value="${h.open}" ${h.closed ? 'disabled' : ''} />
+          <span>à</span>
+          <input type="time" class="f-close" value="${h.close}" ${h.closed ? 'disabled' : ''} />
+        </div>
+      `;
+      container.appendChild(row);
+
+      row.querySelector('.f-closed').addEventListener('change', (e) => {
+        const closed = e.target.checked;
+        row.querySelector('.day-times').style.opacity = closed ? '.4' : '1';
+        row.querySelector('.f-open').disabled = closed;
+        row.querySelector('.f-close').disabled = closed;
+      });
+    });
+  }
+
+  function readHoursRows(container) {
+    const hours = {};
+    container.querySelectorAll('.day-row').forEach((row) => {
+      const day = row.dataset.day;
+      hours[day] = {
+        closed: row.querySelector('.f-closed').checked,
+        open: row.querySelector('.f-open').value || '09:00',
+        close: row.querySelector('.f-close').value || '17:00'
+      };
+    });
+    return hours;
+  }
+
+  // ------------------------------------------------------------------
   // Auth
   // ------------------------------------------------------------------
+  // Un lien d'invitation ou de mot de passe oublié ajoute #type=invite ou
+  // #type=recovery à l'URL. Supabase déclenche un évènement différent
+  // selon la version/le cas (PASSWORD_RECOVERY ou simplement SIGNED_IN) —
+  // on se base donc aussi sur l'URL pour être sûr de rediriger vers
+  // l'étape "choisis ton mot de passe" dans les deux cas.
+  const urlAuthType = new URLSearchParams(window.location.hash.slice(1)).get('type');
+
   async function checkSession() {
     const { data: { session } } = await sb.auth.getSession();
     if (session) showApp(session.user);
@@ -61,9 +127,12 @@ const sb = createClient(
     el('admin-app').classList.remove('hidden');
     el('admin-user-email').textContent = user?.email || '';
     el('public-link').value = window.location.origin + window.location.pathname.replace(/admin\.html$/, '');
+    state.currentUser = user;
+
     await loadBusinessName();
+    await loadServices();
+    await loadTeamAndRole();
     loadAppointments();
-    loadServices();
     loadSettings();
   }
 
@@ -114,11 +183,18 @@ const sb = createClient(
   });
 
   // Quand l'utilisateur clique le lien reçu par courriel (mot de passe oublié
-  // ou invitation), Supabase déclenche cet évènement avec une session valide.
+  // ou invitation), Supabase déclenche une session valide.
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === 'PASSWORD_RECOVERY' && session) {
-      showApp(session.user);
-      document.querySelector('[data-tab="account"]').click();
+    const isRecoveryOrInvite = event === 'PASSWORD_RECOVERY'
+      || (event === 'SIGNED_IN' && (urlAuthType === 'invite' || urlAuthType === 'recovery'));
+    if (isRecoveryOrInvite && session) {
+      showApp(session.user).then(() => {
+        document.querySelector('[data-tab="account"]').click();
+        if (urlAuthType === 'invite') {
+          const note = el('pwd-note');
+          if (note) note.textContent = 'Bienvenue ! Choisis ton mot de passe ci-dessous pour activer ton compte.';
+        }
+      });
     }
   });
 
@@ -153,11 +229,238 @@ const sb = createClient(
   // ------------------------------------------------------------------
   document.querySelectorAll('.tab-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      if (btn.classList.contains('hidden')) return;
       document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach((p) => p.classList.add('hidden'));
       btn.classList.add('active');
       el(`tab-${btn.dataset.tab}`).classList.remove('hidden');
     });
+  });
+
+  // ------------------------------------------------------------------
+  // Équipe + rôle (propriétaire vs employé(e))
+  // ------------------------------------------------------------------
+  async function loadTeamAndRole() {
+    const [{ data: employees, error }, { data: empServices }] = await Promise.all([
+      sb.from('employees').select('*').order('role', { ascending: false }).order('full_name', { ascending: true }),
+      sb.from('employee_services').select('employee_id, service_id')
+    ]);
+
+    if (error) {
+      console.error('Erreur de chargement de l\'équipe :', error.message);
+      return;
+    }
+
+    const svcMap = {};
+    (empServices || []).forEach((row) => {
+      if (!svcMap[row.employee_id]) svcMap[row.employee_id] = new Set();
+      svcMap[row.employee_id].add(row.service_id);
+    });
+
+    state.employees = (employees || []).map((e) => ({ ...e, serviceIds: svcMap[e.id] || new Set() }));
+    state.myEmployee = state.employees.find((e) => e.user_id === state.currentUser?.id) || null;
+    state.isOwner = state.myEmployee?.role === 'owner';
+    state.multiEmployee = state.employees.filter((e) => e.active).length > 1;
+
+    applyRoleVisibility();
+    populateEmployeeFilter();
+
+    if (state.myEmployee) {
+      el('my-name-input').value = state.myEmployee.full_name || '';
+    }
+
+    if (state.isOwner) {
+      renderTeamList();
+    } else if (state.myEmployee) {
+      buildHoursRows(el('hours-mine-list'), state.myEmployee.hours);
+    }
+  }
+
+  function applyRoleVisibility() {
+    el('tab-btn-services').classList.toggle('hidden', !state.isOwner);
+    el('tab-btn-team').classList.toggle('hidden', !state.isOwner);
+    el('hours-owner-section').classList.toggle('hidden', !state.isOwner);
+    el('hours-mine-card').classList.toggle('hidden', state.isOwner);
+
+    // Si l'onglet actif vient d'être caché (ex. reconnexion sous un autre
+    // rôle), retombe sur Rendez-vous.
+    const activeBtn = document.querySelector('.tab-btn.active');
+    if (activeBtn && activeBtn.classList.contains('hidden')) {
+      document.querySelector('[data-tab="appointments"]').click();
+    }
+  }
+
+  function populateEmployeeFilter() {
+    const sel = el('employee-filter');
+    const show = state.isOwner && state.multiEmployee;
+    sel.classList.toggle('hidden', !show);
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Toute l\'équipe</option>' +
+      state.employees.filter((e) => e.active).map((e) => `<option value="${e.id}">${escapeHtml(e.full_name)}</option>`).join('');
+    if (show) sel.value = current;
+  }
+
+  el('employee-filter').addEventListener('change', () => {
+    if (state.apptView === 'calendar') renderCalendar();
+    else loadAppointments();
+  });
+
+  function renderTeamList() {
+    const list = el('team-list');
+    if (!state.employees.length) {
+      list.innerHTML = '<p class="empty-note">Aucun membre pour le moment.</p>';
+      return;
+    }
+    list.innerHTML = '';
+
+    state.employees.forEach((emp) => {
+      const row = document.createElement('div');
+      row.className = 'service-row';
+
+      if (emp.role === 'owner') {
+        row.innerHTML = `
+          <div class="grid2">
+            <div><label>Nom</label><input type="text" value="${escapeHtml(emp.full_name)}" disabled /></div>
+            <div><label>Courriel</label><input type="email" value="${escapeHtml(emp.email)}" disabled /></div>
+          </div>
+          <p class="empty-note" style="padding-top:0;">Propriétaire — gère les services, l'horaire général et l'équipe. Modifie son propre nom dans l'onglet Compte.</p>
+        `;
+        list.appendChild(row);
+        return;
+      }
+
+      row.innerHTML = `
+        <div class="grid2">
+          <div>
+            <label>Nom</label>
+            <input type="text" class="f-name" value="${escapeHtml(emp.full_name)}" />
+          </div>
+          <div>
+            <label>Téléphone</label>
+            <input type="tel" class="f-phone" value="${escapeHtml(emp.phone || '')}" />
+          </div>
+        </div>
+        <label>Courriel</label>
+        <input type="email" value="${escapeHtml(emp.email)}" disabled />
+        <div class="checkbox-line">
+          <input type="checkbox" class="f-active" id="emp-active-${emp.id}" ${emp.active ? 'checked' : ''} />
+          <label for="emp-active-${emp.id}">Actif (visible pour les client·e·s, peut se connecter)</label>
+        </div>
+        <label style="margin-top:14px;">Services offerts</label>
+        <div class="checkbox-grid" data-services><p class="empty-note">Aucun service créé.</p></div>
+        <label style="margin-top:14px;">Horaire</label>
+        <div data-hours></div>
+        <div class="row-actions">
+          <button class="btn-small danger" data-remove-emp="${emp.id}">Retirer</button>
+          <button class="btn-small primary" data-save-emp="${emp.id}">Enregistrer</button>
+        </div>
+      `;
+      list.appendChild(row);
+
+      const svcWrap = row.querySelector('[data-services]');
+      if (state.services.length) {
+        svcWrap.innerHTML = state.services.map((s) => `
+          <label class="checkbox-line svc-check">
+            <input type="checkbox" class="f-svc" value="${s.id}" ${emp.serviceIds?.has(s.id) ? 'checked' : ''} />
+            ${escapeHtml(s.name)}
+          </label>
+        `).join('');
+      }
+
+      const hrsWrap = row.querySelector('[data-hours]');
+      buildHoursRows(hrsWrap, emp.hours);
+
+      row.querySelector('[data-save-emp]').addEventListener('click', async () => {
+        const btn = row.querySelector('[data-save-emp]');
+        btn.disabled = true;
+
+        const { error: empErr } = await sb.from('employees').update({
+          full_name: row.querySelector('.f-name').value.trim(),
+          phone: row.querySelector('.f-phone').value.trim() || null,
+          active: row.querySelector('.f-active').checked,
+          hours: readHoursRows(hrsWrap)
+        }).eq('id', emp.id);
+
+        if (empErr) {
+          btn.disabled = false;
+          alert(empErr.message);
+          return;
+        }
+
+        const selectedIds = Array.from(row.querySelectorAll('.f-svc:checked')).map((cb) => cb.value);
+        await sb.from('employee_services').delete().eq('employee_id', emp.id);
+        if (selectedIds.length) {
+          await sb.from('employee_services').insert(selectedIds.map((sid) => ({ employee_id: emp.id, service_id: sid })));
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Enregistré !';
+        setTimeout(() => (btn.textContent = 'Enregistrer'), 1200);
+        loadTeamAndRole();
+      });
+
+      row.querySelector('[data-remove-emp]').addEventListener('click', async () => {
+        if (!confirm(`Retirer ${emp.full_name} de l'équipe ? Ses rendez-vous déjà pris restent dans l'historique — désactive-la plutôt si tu préfères juste la cacher.`)) return;
+        const { error } = await sb.from('employees').delete().eq('id', emp.id);
+        if (error) {
+          alert(`Impossible de la retirer complètement (probablement parce qu'elle a des rendez-vous) : ${error.message}\nDésactive-la plutôt en décochant "Actif".`);
+          return;
+        }
+        loadTeamAndRole();
+      });
+    });
+  }
+
+  el('add-employee-btn').addEventListener('click', async () => {
+    const errBox = el('new-emp-error');
+    const note = el('new-emp-note');
+    errBox.classList.add('hidden');
+    note.textContent = '';
+
+    const full_name = el('new-emp-name').value.trim();
+    const phone = el('new-emp-phone').value.trim();
+    const email = el('new-emp-email').value.trim();
+
+    if (!full_name || !email) {
+      errBox.textContent = 'Le nom et le courriel sont requis.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+
+    const btn = el('add-employee-btn');
+    btn.disabled = true;
+    btn.textContent = 'Envoi…';
+
+    const redirect_to = window.location.origin + window.location.pathname;
+    const { data, error } = await sb.functions.invoke('invite-employee', {
+      body: { full_name, phone, email, redirect_to }
+    });
+
+    btn.disabled = false;
+    btn.textContent = "Envoyer l'invitation";
+
+    if (error || data?.error) {
+      let code = data?.error || '';
+      if (!code && error?.context?.json) {
+        try { code = (await error.context.json())?.error || ''; } catch { /* ignore */ }
+      }
+      const messages = {
+        EMPLOYEE_ALREADY_EXISTS: 'Cette personne fait déjà partie de ton équipe.',
+        AUTH_USER_ALREADY_EXISTS: 'Un compte existe déjà avec ce courriel.',
+        FORBIDDEN_NOT_OWNER: "Seul(e) le/la propriétaire peut ajouter des employé(e)s.",
+        MISSING_FULL_NAME: 'Le nom est requis.',
+        INVALID_EMAIL: 'Courriel invalide.'
+      };
+      errBox.textContent = messages[code] || "Une erreur est survenue. Vérifie que l'edge function \"invite-employee\" est bien déployée (voir DEPLOYMENT.md).";
+      errBox.classList.remove('hidden');
+      return;
+    }
+
+    el('new-emp-name').value = '';
+    el('new-emp-phone').value = '';
+    el('new-emp-email').value = '';
+    note.textContent = `Invitation envoyée à ${email}.`;
+    loadTeamAndRole();
   });
 
   // ------------------------------------------------------------------
@@ -168,7 +471,7 @@ const sb = createClient(
       <div class="appt-row">
         <div class="time">${hhmm(a.start_time)} – ${hhmm(a.end_time)}</div>
         <div class="info">
-          <div class="service">${escapeHtml(a.service_name)}</div>
+          <div class="service">${escapeHtml(a.service_name)}${state.multiEmployee ? ` <span class="employee-tag">${escapeHtml(a.employee_name)}</span>` : ''}</div>
           <div class="client">${escapeHtml(a.client_name)} · ${escapeHtml(a.client_phone)} · ${escapeHtml(a.client_email)}</div>
         </div>
         <span class="badge ${a.status}">${a.status === 'cancelled' ? 'Annulé' : 'Confirmé'}</span>
@@ -206,6 +509,9 @@ const sb = createClient(
     if (!el('show-all-toggle').checked) {
       query = query.gte('appt_date', todayISO());
     }
+    const empFilter = el('employee-filter').value;
+    if (empFilter) query = query.eq('employee_id', empFilter);
+
     const { data: appts, error } = await query;
 
     if (error) {
@@ -271,6 +577,7 @@ const sb = createClient(
   el('view-calendar-btn').addEventListener('click', () => switchApptView('calendar'));
 
   function switchApptView(view) {
+    state.apptView = view;
     el('view-list-btn').classList.toggle('active', view === 'list');
     el('view-calendar-btn').classList.toggle('active', view === 'calendar');
     el('appointments-list-view').classList.toggle('hidden', view !== 'list');
@@ -300,11 +607,14 @@ const sb = createClient(
     const rangeStart = isoFromDate(days[0]);
     const rangeEnd = isoFromDate(days[days.length - 1]);
 
-    const { data: appts } = await sb
+    let query = sb
       .from('appointments')
       .select('appt_date, status')
       .gte('appt_date', rangeStart)
       .lte('appt_date', rangeEnd);
+    const empFilter = el('employee-filter').value;
+    if (empFilter) query = query.eq('employee_id', empFilter);
+    const { data: appts } = await query;
 
     const counts = {};
     (appts || []).forEach((a) => {
@@ -349,11 +659,14 @@ const sb = createClient(
     const box = el('calendar-day-detail');
     box.innerHTML = `<h3>${humanDate(dateStr)}</h3><p class="empty-note">Chargement…</p>`;
 
-    const { data: appts, error } = await sb
+    let query = sb
       .from('appointments')
       .select('*')
       .eq('appt_date', dateStr)
       .order('start_time', { ascending: true });
+    const empFilter = el('employee-filter').value;
+    if (empFilter) query = query.eq('employee_id', empFilter);
+    const { data: appts, error } = await query;
 
     const heading = `<h3>${humanDate(dateStr)}</h3>`;
     if (error) {
@@ -400,7 +713,8 @@ const sb = createClient(
     el('new-svc-duration').value = '';
     el('new-svc-price').value = '';
     el('new-svc-desc').value = '';
-    loadServices();
+    await loadServices();
+    if (state.isOwner) renderTeamList();
   });
 
   async function loadServices() {
@@ -416,6 +730,7 @@ const sb = createClient(
       list.innerHTML = `<p class="empty-note">Erreur : ${escapeHtml(error.message)}</p>`;
       return;
     }
+    state.services = services || [];
     if (!services.length) {
       list.innerHTML = '<p class="empty-note">Aucun service. Ajoutes-en un ci-dessus.</p>';
       return;
@@ -474,6 +789,7 @@ const sb = createClient(
         }
         btn.textContent = 'Enregistré !';
         setTimeout(() => (btn.textContent = 'Enregistrer'), 1200);
+        state.services = state.services.map((x) => (x.id === s.id ? { ...x, name: row.querySelector('.f-name').value.trim() } : x));
       });
 
       row.querySelector('[data-delete]').addEventListener('click', async () => {
@@ -483,13 +799,14 @@ const sb = createClient(
           alert(error.message);
           return;
         }
-        loadServices();
+        await loadServices();
+        if (state.isOwner) renderTeamList();
       });
     });
   }
 
   // ------------------------------------------------------------------
-  // Horaire / réglages
+  // Horaire / réglages généraux (propriétaire)
   // ------------------------------------------------------------------
   async function loadSettings() {
     const { data: s, error } = await sb.from('business_settings').select('*').eq('id', true).single();
@@ -502,34 +819,7 @@ const sb = createClient(
     el('setting-notice').value = s.min_notice_hours;
     el('setting-advance').value = s.max_advance_days;
 
-    const hoursList = el('hours-list');
-    hoursList.innerHTML = '';
-    DAY_KEYS.forEach((day) => {
-      const h = s.business_hours[day] || { closed: true, open: '09:00', close: '17:00' };
-      const row = document.createElement('div');
-      row.className = 'day-row';
-      row.dataset.day = day;
-      row.innerHTML = `
-        <div class="day-name">${DAY_LABELS[day]}</div>
-        <label class="day-closed-toggle">
-          <input type="checkbox" class="f-closed" ${h.closed ? 'checked' : ''} />
-          Fermé
-        </label>
-        <div class="day-times" style="${h.closed ? 'opacity:.4' : ''}">
-          <input type="time" class="f-open" value="${h.open}" ${h.closed ? 'disabled' : ''} />
-          <span>à</span>
-          <input type="time" class="f-close" value="${h.close}" ${h.closed ? 'disabled' : ''} />
-        </div>
-      `;
-      hoursList.appendChild(row);
-
-      row.querySelector('.f-closed').addEventListener('change', (e) => {
-        const closed = e.target.checked;
-        row.querySelector('.day-times').style.opacity = closed ? '.4' : '1';
-        row.querySelector('.f-open').disabled = closed;
-        row.querySelector('.f-close').disabled = closed;
-      });
-    });
+    buildHoursRows(el('hours-list'), s.business_hours);
   }
 
   el('save-hours-btn').addEventListener('click', async () => {
@@ -537,15 +827,7 @@ const sb = createClient(
     const note = el('hours-save-note');
     btn.disabled = true;
 
-    const business_hours = {};
-    document.querySelectorAll('#hours-list .day-row').forEach((row) => {
-      const day = row.dataset.day;
-      business_hours[day] = {
-        closed: row.querySelector('.f-closed').checked,
-        open: row.querySelector('.f-open').value || '09:00',
-        close: row.querySelector('.f-close').value || '17:00'
-      };
-    });
+    const business_hours = readHoursRows(el('hours-list'));
 
     const { error } = await sb.from('business_settings').update({
       business_name: el('setting-biz-name').value.trim(),
@@ -557,6 +839,17 @@ const sb = createClient(
       business_hours
     }).eq('id', true);
 
+    if (!error) {
+      // Tant qu'il n'y a pas d'équipe, l'horaire général EST l'horaire du/de
+      // la propriétaire — on le garde synchronisé pour ne rien avoir de
+      // plus à gérer en mode solo. Dès qu'un(e) employé(e) est ajouté(e),
+      // cette synchro automatique s'arrête (chacun·e gère son horaire).
+      const activeCount = state.employees.filter((e) => e.active).length;
+      if (state.isOwner && activeCount <= 1 && state.myEmployee) {
+        await sb.from('employees').update({ hours: business_hours }).eq('id', state.myEmployee.id);
+      }
+    }
+
     btn.disabled = false;
 
     if (error) {
@@ -566,6 +859,27 @@ const sb = createClient(
     }
     note.textContent = 'Réglages enregistrés.';
     loadBusinessName();
+    setTimeout(() => (note.textContent = ''), 2500);
+  });
+
+  // ------------------------------------------------------------------
+  // Mon horaire (employé(e) non-propriétaire)
+  // ------------------------------------------------------------------
+  el('save-my-hours-btn').addEventListener('click', async () => {
+    const btn = el('save-my-hours-btn');
+    const note = el('hours-mine-save-note');
+    btn.disabled = true;
+
+    const hours = readHoursRows(el('hours-mine-list'));
+    const { error } = await sb.rpc('update_my_employee_profile', { p_full_name: null, p_phone: null, p_hours: hours });
+
+    btn.disabled = false;
+    if (error) {
+      note.textContent = '';
+      alert(error.message);
+      return;
+    }
+    note.textContent = 'Horaire enregistré.';
     setTimeout(() => (note.textContent = ''), 2500);
   });
 
@@ -604,6 +918,27 @@ const sb = createClient(
     note.textContent = 'Mot de passe mis à jour.';
     el('pwd-new').value = '';
     el('pwd-confirm').value = '';
+  });
+
+  el('save-my-name-btn').addEventListener('click', async () => {
+    const note = el('my-name-note');
+    const name = el('my-name-input').value.trim();
+    note.textContent = '';
+    if (!name) {
+      alert('Le nom ne peut pas être vide.');
+      return;
+    }
+    const btn = el('save-my-name-btn');
+    btn.disabled = true;
+    const { error } = await sb.rpc('update_my_employee_profile', { p_full_name: name, p_phone: null, p_hours: null });
+    btn.disabled = false;
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    note.textContent = 'Nom mis à jour.';
+    setTimeout(() => (note.textContent = ''), 2000);
+    loadTeamAndRole();
   });
 
   // ------------------------------------------------------------------

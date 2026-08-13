@@ -124,6 +124,12 @@ h2.section-title {
   margin-top: 2px;
 }
 
+.service-card .chevron {
+  color: var(--ink-soft);
+  font-size: 1.1rem;
+}
+.service-card:hover .chevron, .service-card:focus-visible .chevron { color: var(--brand-dark); }
+
 .service-card .price {
   font-weight: 600;
   color: var(--brand-dark);
@@ -423,6 +429,20 @@ footer.tiny {
   font-size: 0.87rem;
 }
 
+.employee-tag {
+  display: inline-block;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  color: var(--brand-dark);
+  background: var(--brand-light);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
 .badge {
   font-size: 0.75rem;
   padding: 3px 9px;
@@ -462,6 +482,17 @@ footer.tiny {
 }
 .checkbox-line input { width: auto; }
 .checkbox-line label { margin: 0; }
+
+.checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 8px;
+}
+.checkbox-grid .svc-check {
+  margin: 0;
+  font-size: 0.9rem;
+}
 
 .day-row {
   display: flex;

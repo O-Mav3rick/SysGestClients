@@ -11,7 +11,11 @@ const sb = createClient(
 (() => {
   const state = {
     business: null,
+    employees: [],
+    multiEmployee: false,
+    steps: ['service', 'time', 'info', 'done'], // recalculé une fois les employé(e)s chargé(e)s
     services: [],
+    selectedEmployee: null,
     selectedService: null,
     selectedDate: null,
     selectedSlot: null
@@ -19,14 +23,27 @@ const sb = createClient(
 
   const el = (id) => document.getElementById(id);
 
-  function setStep(n) {
-    document.querySelectorAll('.steps .dot').forEach((d) => {
-      d.classList.toggle('active', Number(d.dataset.step) <= n);
+  function renderDots() {
+    const wrap = el('steps-dots');
+    wrap.innerHTML = '';
+    state.steps.forEach((_, i) => {
+      const d = document.createElement('div');
+      d.className = 'dot';
+      d.dataset.step = String(i + 1);
+      wrap.appendChild(d);
     });
-    el('step-service').classList.toggle('hidden', n !== 1);
-    el('step-time').classList.toggle('hidden', n !== 2);
-    el('step-info').classList.toggle('hidden', n !== 3);
-    el('step-done').classList.toggle('hidden', n !== 4);
+  }
+
+  function setStep(name) {
+    const idx = state.steps.indexOf(name);
+    document.querySelectorAll('.steps .dot').forEach((d) => {
+      d.classList.toggle('active', Number(d.dataset.step) <= idx + 1);
+    });
+    el('step-employee').classList.toggle('hidden', name !== 'employee');
+    el('step-service').classList.toggle('hidden', name !== 'service');
+    el('step-time').classList.toggle('hidden', name !== 'time');
+    el('step-info').classList.toggle('hidden', name !== 'info');
+    el('step-done').classList.toggle('hidden', name !== 'done');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -80,22 +97,87 @@ const sb = createClient(
     document.title = `Rendez-vous — ${state.business.name}`;
   }
 
-  async function loadServices() {
-    const wrap = el('service-list');
+  // ------------------------------------------------------------------
+  // Étape : choix de la spécialiste (sautée automatiquement s'il n'y en
+  // a qu'une seule — comportement identique à l'ancienne version solo).
+  // ------------------------------------------------------------------
+  async function loadEmployees() {
+    const wrap = el('employee-list');
     const { data, error } = await sb
-      .from('services')
-      .select('id, name, duration_minutes, price_cents, description')
+      .from('employees')
+      .select('id, full_name')
       .eq('active', true)
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true });
+      .order('full_name', { ascending: true });
 
     if (error || !data || !data.length) {
+      wrap.innerHTML = '<p class="empty-note">Aucun membre de l\'équipe disponible pour le moment.</p>';
+      state.employees = [];
+      state.multiEmployee = false;
+      state.steps = ['service', 'time', 'info', 'done'];
+      renderDots();
+      return;
+    }
+
+    state.employees = data;
+    state.multiEmployee = data.length > 1;
+
+    if (!state.multiEmployee) {
+      // Une seule personne dans l'équipe : on saute directement à l'étape service.
+      state.steps = ['service', 'time', 'info', 'done'];
+      renderDots();
+      selectEmployee(data[0], { silent: true });
+      return;
+    }
+
+    state.steps = ['employee', 'service', 'time', 'info', 'done'];
+    renderDots();
+
+    wrap.innerHTML = '';
+    data.forEach((emp) => {
+      const btn = document.createElement('button');
+      btn.className = 'service-card';
+      btn.type = 'button';
+      btn.innerHTML = `<div><div class="name">${escapeHtml(emp.full_name)}</div></div><div class="chevron">&rarr;</div>`;
+      btn.addEventListener('click', () => selectEmployee(emp));
+      wrap.appendChild(btn);
+    });
+
+    setStep('employee');
+  }
+
+  function selectEmployee(emp, opts) {
+    state.selectedEmployee = emp;
+    state.selectedService = null;
+    document.querySelector('[data-back="employee"]').classList.toggle('hidden', !state.multiEmployee);
+    el('service-title').textContent = state.multiEmployee
+      ? `Choisis ton service — avec ${emp.full_name}`
+      : 'Choisis ton service';
+    loadServices();
+    if (!(opts && opts.silent)) setStep('service');
+  }
+
+  // ------------------------------------------------------------------
+  // Étape : choix du service (filtré selon la spécialiste choisie)
+  // ------------------------------------------------------------------
+  async function loadServices() {
+    const wrap = el('service-list');
+    wrap.innerHTML = '<p class="empty-note">Chargement des services…</p>';
+
+    const { data, error } = await sb
+      .from('employee_services')
+      .select('service_id, services!inner(id, name, duration_minutes, price_cents, description, sort_order)')
+      .eq('employee_id', state.selectedEmployee.id);
+
+    const services = (error || !data) ? [] : data.map((row) => row.services)
+      .sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+
+    if (!services.length) {
       wrap.innerHTML = '<p class="empty-note">Aucun service disponible pour le moment.</p>';
       return;
     }
-    state.services = data;
+    state.services = services;
     wrap.innerHTML = '';
-    data.forEach((s) => {
+    services.forEach((s) => {
       const btn = document.createElement('button');
       btn.className = 'service-card';
       btn.type = 'button';
@@ -109,12 +191,14 @@ const sb = createClient(
       btn.addEventListener('click', () => selectService(s));
       wrap.appendChild(btn);
     });
+
+    setStep('service');
   }
 
   function selectService(service) {
     state.selectedService = service;
     state.selectedSlot = null;
-    el('time-title').textContent = `2. Choisis une date et une heure — ${service.name}`;
+    el('time-title').textContent = `Choisis une date et une heure — ${service.name}`;
 
     const dateInput = el('date-input');
     const min = todayISO();
@@ -124,7 +208,7 @@ const sb = createClient(
     dateInput.value = min;
     state.selectedDate = min;
 
-    setStep(2);
+    setStep('time');
     loadSlots();
   }
 
@@ -135,10 +219,11 @@ const sb = createClient(
     note.textContent = 'Chargement des disponibilités…';
     note.classList.remove('hidden');
 
-    if (!state.selectedService || !state.selectedDate) return;
+    if (!state.selectedService || !state.selectedDate || !state.selectedEmployee) return;
 
     const { data, error } = await sb.rpc('get_available_slots', {
       p_service_id: state.selectedService.id,
+      p_employee_id: state.selectedEmployee.id,
       p_date: state.selectedDate
     });
 
@@ -166,13 +251,14 @@ const sb = createClient(
     const s = state.selectedService;
     const slot = state.selectedSlot;
     el('recap-box').innerHTML = `
+      ${state.multiEmployee ? `<div class="row"><span>Avec</span><span>${escapeHtml(state.selectedEmployee.full_name)}</span></div>` : ''}
       <div class="row"><span>Service</span><span>${escapeHtml(s.name)}</span></div>
       <div class="row"><span>Date</span><span>${humanDate(state.selectedDate)}</span></div>
       <div class="row"><span>Heure</span><span>${slot.start} – ${slot.end}</span></div>
       ${s.price_cents != null ? `<div class="row"><span>Prix</span><span>${money(s.price_cents)}</span></div>` : ''}
     `;
     el('form-error').classList.add('hidden');
-    setStep(3);
+    setStep('info');
   }
 
   async function submitAppointment() {
@@ -198,6 +284,7 @@ const sb = createClient(
 
     const { data, error } = await sb.rpc('book_appointment', {
       p_service_id: state.selectedService.id,
+      p_employee_id: state.selectedEmployee.id,
       p_date: state.selectedDate,
       p_start_time: state.selectedSlot.start,
       p_client_name: name,
@@ -213,7 +300,7 @@ const sb = createClient(
         btn.disabled = false;
         btn.textContent = 'Confirmer le rendez-vous';
         setTimeout(() => {
-          setStep(2);
+          setStep('time');
           loadSlots();
         }, 1500);
         return;
@@ -227,13 +314,14 @@ const sb = createClient(
 
     const appt = Array.isArray(data) ? data[0] : data;
     el('done-recap').innerHTML = `
+      ${state.multiEmployee ? `<div class="row"><span>Avec</span><span>${escapeHtml(appt.employee_name)}</span></div>` : ''}
       <div class="row"><span>Service</span><span>${escapeHtml(appt.service_name)}</span></div>
       <div class="row"><span>Date</span><span>${humanDate(appt.appt_date)}</span></div>
       <div class="row"><span>Heure</span><span>${hhmm(appt.start_time)} – ${hhmm(appt.end_time)}</span></div>
     `;
     btn.disabled = false;
     btn.textContent = 'Confirmer le rendez-vous';
-    setStep(4);
+    setStep('done');
   }
 
   function resetFlow() {
@@ -243,7 +331,12 @@ const sb = createClient(
     el('name-input').value = '';
     el('phone-input').value = '';
     el('email-input').value = '';
-    setStep(1);
+    if (state.multiEmployee) {
+      state.selectedEmployee = null;
+      setStep('employee');
+    } else {
+      setStep('service');
+    }
   }
 
   el('date-input').addEventListener('change', (e) => {
@@ -254,8 +347,9 @@ const sb = createClient(
   document.querySelectorAll('[data-back]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.back;
-      if (target === 'service') setStep(1);
-      if (target === 'time') setStep(2);
+      if (target === 'employee') setStep('employee');
+      if (target === 'service') setStep('service');
+      if (target === 'time') setStep('time');
     });
   });
 
@@ -263,6 +357,5 @@ const sb = createClient(
   el('new-appt-btn').addEventListener('click', resetFlow);
 
   loadBusiness();
-  loadServices();
-  setStep(1);
+  loadEmployees();
 })();

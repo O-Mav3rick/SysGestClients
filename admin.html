@@ -47,8 +47,9 @@
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="appointments">Rendez-vous</button>
-    <button class="tab-btn" data-tab="services">Services</button>
+    <button class="tab-btn" data-tab="services" id="tab-btn-services">Services</button>
     <button class="tab-btn" data-tab="hours">Horaire</button>
+    <button class="tab-btn" data-tab="team" id="tab-btn-team">Équipe</button>
     <button class="tab-btn" data-tab="account">Compte</button>
   </div>
 
@@ -58,6 +59,9 @@
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
         <h2 class="section-title" style="margin:0;">Rendez-vous</h2>
         <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <select id="employee-filter" class="hidden" style="width:auto; padding:7px 10px;">
+            <option value="">Toute l'équipe</option>
+          </select>
           <div class="view-toggle">
             <button class="view-toggle-btn active" id="view-list-btn" type="button">Liste</button>
             <button class="view-toggle-btn" id="view-calendar-btn" type="button">Calendrier</button>
@@ -121,45 +125,93 @@
 
   <!-- Onglet Horaire -->
   <div id="tab-hours" class="tab-panel hidden">
-    <div class="card">
-      <h2 class="section-title">Informations générales</h2>
-      <div class="grid2">
-        <div>
-          <label for="setting-biz-name">Nom de la business</label>
-          <input type="text" id="setting-biz-name" />
+    <div id="hours-owner-section">
+      <div class="card">
+        <h2 class="section-title">Informations générales</h2>
+        <div class="grid2">
+          <div>
+            <label for="setting-biz-name">Nom de la business</label>
+            <input type="text" id="setting-biz-name" />
+          </div>
+          <div>
+            <label for="setting-timezone">Fuseau horaire</label>
+            <input type="text" id="setting-timezone" placeholder="Ex. America/Toronto" />
+          </div>
         </div>
-        <div>
-          <label for="setting-timezone">Fuseau horaire</label>
-          <input type="text" id="setting-timezone" placeholder="Ex. America/Toronto" />
+        <div class="grid2">
+          <div>
+            <label for="setting-interval">Intervalle entre les créneaux (minutes)</label>
+            <input type="number" id="setting-interval" min="5" step="5" />
+          </div>
+          <div>
+            <label for="setting-buffer">Pause entre deux rendez-vous (minutes)</label>
+            <input type="number" id="setting-buffer" min="0" step="5" />
+          </div>
+        </div>
+        <div class="grid2">
+          <div>
+            <label for="setting-notice">Délai minimum avant réservation (heures)</label>
+            <input type="number" id="setting-notice" min="0" step="1" />
+          </div>
+          <div>
+            <label for="setting-advance">Réservable jusqu'à (jours à l'avance)</label>
+            <input type="number" id="setting-advance" min="1" step="1" />
+          </div>
         </div>
       </div>
-      <div class="grid2">
-        <div>
-          <label for="setting-interval">Intervalle entre les créneaux (minutes)</label>
-          <input type="number" id="setting-interval" min="5" step="5" />
-        </div>
-        <div>
-          <label for="setting-buffer">Pause entre deux rendez-vous (minutes)</label>
-          <input type="number" id="setting-buffer" min="0" step="5" />
-        </div>
-      </div>
-      <div class="grid2">
-        <div>
-          <label for="setting-notice">Délai minimum avant réservation (heures)</label>
-          <input type="number" id="setting-notice" min="0" step="1" />
-        </div>
-        <div>
-          <label for="setting-advance">Réservable jusqu'à (jours à l'avance)</label>
-          <input type="number" id="setting-advance" min="1" step="1" />
-        </div>
+
+      <div class="card">
+        <h2 class="section-title" id="hours-business-title">Heures d'ouverture</h2>
+        <p class="empty-note" id="hours-business-note" style="padding-top:0;">
+          L'horaire général du commerce. Personne ne peut être réservé en dehors de ces heures,
+          même si son horaire personnel (onglet Équipe) est plus large.
+        </p>
+        <div id="hours-list"></div>
+        <div id="hours-save-note" class="save-note"></div>
+        <button class="btn" id="save-hours-btn">Enregistrer l'horaire</button>
       </div>
     </div>
 
+    <div class="card hidden" id="hours-mine-card">
+      <h2 class="section-title">Mon horaire</h2>
+      <p class="empty-note" style="padding-top:0;">
+        Les heures où tu es disponible pour les client·e·s. Limité par les heures d'ouverture
+        générales du commerce, même si tu indiques une plage plus large ici.
+      </p>
+      <div id="hours-mine-list"></div>
+      <div id="hours-mine-save-note" class="save-note"></div>
+      <button class="btn" id="save-my-hours-btn">Enregistrer mon horaire</button>
+    </div>
+  </div>
+
+  <!-- Onglet Équipe (propriétaire seulement) -->
+  <div id="tab-team" class="tab-panel hidden">
     <div class="card">
-      <h2 class="section-title">Heures d'ouverture</h2>
-      <div id="hours-list"></div>
-      <div id="hours-save-note" class="save-note"></div>
-      <button class="btn" id="save-hours-btn">Enregistrer l'horaire</button>
+      <h2 class="section-title">Ajouter un(e) employé(e)</h2>
+      <div class="grid2">
+        <div>
+          <label for="new-emp-name">Nom complet</label>
+          <input type="text" id="new-emp-name" placeholder="Ex. Marie Tremblay" />
+        </div>
+        <div>
+          <label for="new-emp-phone">Téléphone (optionnel)</label>
+          <input type="tel" id="new-emp-phone" placeholder="Ex. 514 555-1234" />
+        </div>
+      </div>
+      <label for="new-emp-email">Courriel</label>
+      <input type="email" id="new-emp-email" placeholder="Ex. marie@courriel.com" />
+      <div id="new-emp-error" class="alert hidden"></div>
+      <div id="new-emp-note" class="save-note"></div>
+      <button class="btn" id="add-employee-btn">Envoyer l'invitation</button>
+      <p class="empty-note">
+        Un courriel est envoyé à cette adresse pour qu'elle/il puisse choisir son propre mot de
+        passe et se connecter à cette même page.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Équipe actuelle</h2>
+      <div id="team-list"><p class="empty-note">Chargement…</p></div>
     </div>
   </div>
 
@@ -177,12 +229,11 @@
     </div>
 
     <div class="card">
-      <h2 class="section-title">Inviter un autre admin</h2>
-      <p class="empty-note" style="padding-top:0;">
-        Depuis le tableau de bord Supabase : <strong>Authentication → Users → Add user</strong>
-        (ou <strong>Invite</strong> pour envoyer un courriel d'invitation).
-        Toute personne avec un compte peut gérer les services, l'horaire et les rendez-vous.
-      </p>
+      <h2 class="section-title">Mon nom affiché</h2>
+      <label for="my-name-input">Nom complet</label>
+      <input type="text" id="my-name-input" />
+      <div id="my-name-note" class="save-note"></div>
+      <button class="btn-small primary" id="save-my-name-btn">Enregistrer</button>
     </div>
   </div>
 </div>
