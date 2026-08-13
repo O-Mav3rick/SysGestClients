@@ -432,7 +432,12 @@ const sb = createClient(
     btn.textContent = 'Envoi…';
 
     const redirect_to = window.location.origin + window.location.pathname;
-    const { data, error } = await sb.functions.invoke('invite-employee', {
+    // ⚠️ Ta fonction a été déployée sous l'URL "swift-api" (slug généré
+    // automatiquement par Supabase, différent du nom affiché "invite-employee"
+    // dans la liste Edge Functions) — même quirk que "bright-action" pour les
+    // notifications. Si tu redéploies un jour sous le vrai nom, remplace la
+    // chaîne ci-dessous par 'invite-employee'.
+    const { data, error } = await sb.functions.invoke('swift-api', {
       body: { full_name, phone, email, redirect_to }
     });
 
