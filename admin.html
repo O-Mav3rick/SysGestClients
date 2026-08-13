@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Administration — Rendez-vous</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- Écran de connexion -->
+<div id="login-overlay" class="login-overlay">
+  <div class="login-card">
+    <h1>Administration</h1>
+    <p>Connecte-toi pour gérer les services et l'horaire.</p>
+    <form id="login-form">
+      <label for="login-email">Courriel</label>
+      <input type="email" id="login-email" autocomplete="email" required />
+      <label for="login-password">Mot de passe</label>
+      <input type="password" id="login-password" autocomplete="current-password" required />
+      <div id="login-error" class="alert hidden"></div>
+      <div id="login-info" class="save-note"></div>
+      <button class="btn" type="submit" id="login-btn">Se connecter</button>
+      <p style="text-align:center; margin-top:12px;">
+        <a href="#" id="forgot-pwd-link" style="color:var(--brand-dark); font-size:0.85rem;">Mot de passe oublié?</a>
+      </p>
+    </form>
+  </div>
+</div>
+
+<div class="wrap wide hidden" id="admin-app">
+  <div class="admin-topbar">
+    <h1 id="admin-biz-name">Administration</h1>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span id="admin-user-email" style="font-size:0.82rem; color:var(--ink-soft);"></span>
+      <button class="btn-small" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label style="margin:0 0 8px;">Lien de réservation à partager (bio Instagram, Google, etc.)</label>
+    <div class="link-box">
+      <input type="text" id="public-link" readonly />
+      <button class="btn-small primary" id="copy-link-btn">Copier le lien</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="appointments">Rendez-vous</button>
+    <button class="tab-btn" data-tab="services">Services</button>
+    <button class="tab-btn" data-tab="hours">Horaire</button>
+    <button class="tab-btn" data-tab="account">Compte</button>
+  </div>
+
+  <!-- Onglet Rendez-vous -->
+  <div id="tab-appointments" class="tab-panel">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+        <h2 class="section-title" style="margin:0;">Rendez-vous</h2>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <div class="view-toggle">
+            <button class="view-toggle-btn active" id="view-list-btn" type="button">Liste</button>
+            <button class="view-toggle-btn" id="view-calendar-btn" type="button">Calendrier</button>
+          </div>
+          <label id="show-all-wrap" style="display:flex; align-items:center; gap:6px; margin:0; font-size:0.85rem;">
+            <input type="checkbox" id="show-all-toggle" style="width:auto;" />
+            Inclure les dates passées
+          </label>
+        </div>
+      </div>
+
+      <div id="appointments-list-view">
+        <div id="appointments-list"><p class="empty-note">Chargement…</p></div>
+      </div>
+
+      <div id="appointments-calendar-view" class="hidden">
+        <div class="calendar-nav">
+          <button class="btn-small" id="cal-prev-btn" type="button">&larr;</button>
+          <div class="calendar-nav-label" id="cal-month-label"></div>
+          <button class="btn-small" id="cal-next-btn" type="button">&rarr;</button>
+          <button class="btn-small" id="cal-today-btn" type="button">Aujourd'hui</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+        <div id="calendar-day-detail" class="calendar-day-detail"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglet Services -->
+  <div id="tab-services" class="tab-panel hidden">
+    <div class="card">
+      <h2 class="section-title">Ajouter un service</h2>
+      <div class="grid2">
+        <div>
+          <label for="new-svc-name">Nom du service</label>
+          <input type="text" id="new-svc-name" placeholder="Ex. Manucure gel" />
+        </div>
+        <div>
+          <label for="new-svc-duration">Durée (minutes)</label>
+          <input type="number" id="new-svc-duration" min="5" step="5" placeholder="Ex. 45" />
+        </div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label for="new-svc-price">Prix ($, optionnel)</label>
+          <input type="number" id="new-svc-price" min="0" step="0.01" placeholder="Ex. 55.00" />
+        </div>
+        <div>
+          <label for="new-svc-desc">Description (optionnel)</label>
+          <input type="text" id="new-svc-desc" placeholder="Ex. Inclut la pose de vernis" />
+        </div>
+      </div>
+      <button class="btn" id="add-service-btn">Ajouter le service</button>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Services existants</h2>
+      <div id="services-list"><p class="empty-note">Chargement…</p></div>
+    </div>
+  </div>
+
+  <!-- Onglet Horaire -->
+  <div id="tab-hours" class="tab-panel hidden">
+    <div class="card">
+      <h2 class="section-title">Informations générales</h2>
+      <div class="grid2">
+        <div>
+          <label for="setting-biz-name">Nom de la business</label>
+          <input type="text" id="setting-biz-name" />
+        </div>
+        <div>
+          <label for="setting-timezone">Fuseau horaire</label>
+          <input type="text" id="setting-timezone" placeholder="Ex. America/Toronto" />
+        </div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label for="setting-interval">Intervalle entre les créneaux (minutes)</label>
+          <input type="number" id="setting-interval" min="5" step="5" />
+        </div>
+        <div>
+          <label for="setting-buffer">Pause entre deux rendez-vous (minutes)</label>
+          <input type="number" id="setting-buffer" min="0" step="5" />
+        </div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label for="setting-notice">Délai minimum avant réservation (heures)</label>
+          <input type="number" id="setting-notice" min="0" step="1" />
+        </div>
+        <div>
+          <label for="setting-advance">Réservable jusqu'à (jours à l'avance)</label>
+          <input type="number" id="setting-advance" min="1" step="1" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Heures d'ouverture</h2>
+      <div id="hours-list"></div>
+      <div id="hours-save-note" class="save-note"></div>
+      <button class="btn" id="save-hours-btn">Enregistrer l'horaire</button>
+    </div>
+  </div>
+
+  <!-- Onglet Compte -->
+  <div id="tab-account" class="tab-panel hidden">
+    <div class="card">
+      <h2 class="section-title">Changer le mot de passe</h2>
+      <label for="pwd-new">Nouveau mot de passe (min. 6 caractères)</label>
+      <input type="password" id="pwd-new" autocomplete="new-password" />
+      <label for="pwd-confirm">Confirme le nouveau mot de passe</label>
+      <input type="password" id="pwd-confirm" autocomplete="new-password" />
+      <div id="pwd-error" class="alert hidden"></div>
+      <div id="pwd-note" class="save-note"></div>
+      <button class="btn" id="change-pwd-btn">Mettre à jour le mot de passe</button>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Inviter un autre admin</h2>
+      <p class="empty-note" style="padding-top:0;">
+        Depuis le tableau de bord Supabase : <strong>Authentication → Users → Add user</strong>
+        (ou <strong>Invite</strong> pour envoyer un courriel d'invitation).
+        Toute personne avec un compte peut gérer les services, l'horaire et les rendez-vous.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

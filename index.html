@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Prendre rendez-vous</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 id="biz-name">Chargement…</h1>
+    <p>Prends ton rendez-vous en quelques secondes</p>
+  </header>
+
+  <div class="steps">
+    <div class="dot" data-step="1"></div>
+    <div class="dot" data-step="2"></div>
+    <div class="dot" data-step="3"></div>
+    <div class="dot" data-step="4"></div>
+  </div>
+
+  <!-- Étape 1 : choix du service -->
+  <section id="step-service" class="card">
+    <h2 class="section-title">1. Choisis ton service</h2>
+    <div id="service-list" class="service-list">
+      <p class="empty-note">Chargement des services…</p>
+    </div>
+  </section>
+
+  <!-- Étape 2 : choix de la date et de l'heure -->
+  <section id="step-time" class="card hidden">
+    <button class="back-link" data-back="service">&larr; Changer de service</button>
+    <h2 class="section-title" id="time-title">2. Choisis une date et une heure</h2>
+
+    <label for="date-input">Date</label>
+    <input type="date" id="date-input" />
+
+    <div id="slots-wrap" style="margin-top:14px;">
+      <p class="empty-note" id="slots-note">Choisis une date pour voir les disponibilités.</p>
+      <div id="slots-grid" class="slots-grid"></div>
+    </div>
+  </section>
+
+  <!-- Étape 3 : coordonnées -->
+  <section id="step-info" class="card hidden">
+    <button class="back-link" data-back="time">&larr; Changer l'heure</button>
+    <h2 class="section-title">3. Tes coordonnées</h2>
+
+    <div class="recap" id="recap-box"></div>
+
+    <label for="name-input">Nom complet</label>
+    <input type="text" id="name-input" autocomplete="name" placeholder="Ex. Marie Tremblay" />
+
+    <label for="phone-input">Numéro de cellulaire</label>
+    <input type="tel" id="phone-input" autocomplete="tel" placeholder="Ex. 514 555-1234" />
+
+    <label for="email-input">Courriel</label>
+    <input type="email" id="email-input" autocomplete="email" placeholder="Ex. marie@courriel.com" />
+
+    <div id="form-error" class="alert hidden"></div>
+
+    <button class="btn" id="confirm-btn">Confirmer le rendez-vous</button>
+  </section>
+
+  <!-- Étape 4 : confirmation -->
+  <section id="step-done" class="card hidden">
+    <div class="success">
+      <div class="check">✓</div>
+      <h2 class="section-title" style="text-align:center;">Rendez-vous confirmé !</h2>
+    </div>
+    <div class="recap" id="done-recap"></div>
+    <p class="empty-note" style="text-align:center;">Garde cette page ou prends-en une capture d'écran en note.</p>
+    <button class="btn secondary" id="new-appt-btn">Prendre un autre rendez-vous</button>
+  </section>
+
+  <footer class="tiny">Propulsé par ton propre système de rendez-vous</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="client.js"></script>
+</body>
+</html>
