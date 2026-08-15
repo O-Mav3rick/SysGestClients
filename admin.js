@@ -484,7 +484,7 @@ const sb = createClient(
           </div>
           <span class="badge ${a.status}">${a.status === 'cancelled' ? 'Annulé' : 'Confirmé'}</span>
           ${a.status !== 'cancelled' ? `
-            <button class="btn-small" data-move="${a.id}">Déplacer</button>
+            <button class="btn-small warning" data-move="${a.id}">Déplacer</button>
             <button class="btn-small danger" data-cancel="${a.id}">Annuler</button>
           ` : ''}
         </div>
