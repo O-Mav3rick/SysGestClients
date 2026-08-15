@@ -1,17 +1,18 @@
 :root {
-  --brand: #b8895f;
-  --brand-dark: #93684a;
-  --brand-light: #f6ece2;
-  --ink: #2b2320;
-  --ink-soft: #6b5f58;
-  --bg: #fbf7f3;
+  --brand: #cc5d8f;
+  --brand-dark: #a13d6c;
+  --brand-light: #fbe7ef;
+  --ink: #3a2a32;
+  --ink-soft: #8a6b78;
+  --bg: #fff8fa;
   --card: #ffffff;
-  --border: #e9ddd2;
+  --border: #f3d9e3;
   --danger: #c0402f;
   --danger-light: #fbeae7;
   --ok: #3f7d4f;
-  --radius: 14px;
-  --shadow: 0 2px 10px rgba(43, 35, 32, 0.06);
+  --radius: 16px;
+  --shadow: 0 4px 16px rgba(196, 90, 140, 0.12);
+  --font-heading: "Playfair Display", Georgia, serif;
   font-size: 16px;
 }
 
@@ -22,7 +23,7 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Quicksand", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -42,7 +43,10 @@ header.top {
 }
 
 header.top h1 {
-  font-size: 1.5rem;
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.6rem;
   margin: 0 0 4px;
 }
 
@@ -50,6 +54,60 @@ header.top p {
   margin: 0;
   color: var(--ink-soft);
   font-size: 0.95rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Bannière (page client) — photo + dégradé rosé                          */
+/* ---------------------------------------------------------------------- */
+
+.hero {
+  position: relative;
+  height: 230px;
+  overflow: hidden;
+  border-radius: 0 0 28px 28px;
+  box-shadow: var(--shadow);
+  margin-bottom: 4px;
+}
+
+.hero-media {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 30%;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(204, 93, 143, 0.28) 0%, rgba(161, 61, 108, 0.62) 100%);
+}
+
+.hero-text {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 20px;
+  color: #fff;
+}
+
+.hero-text h1 {
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 2.1rem;
+  margin: 0 0 6px;
+  text-shadow: 0 2px 14px rgba(58, 20, 40, 0.35);
+}
+
+.hero-text p {
+  margin: 0;
+  font-size: 0.95rem;
+  opacity: 0.95;
+  text-shadow: 0 1px 8px rgba(58, 20, 40, 0.3);
 }
 
 .card {
@@ -83,7 +141,10 @@ header.top p {
 }
 
 h2.section-title {
-  font-size: 1.05rem;
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.2rem;
   margin: 0 0 14px;
 }
 
@@ -227,14 +288,15 @@ input:focus, textarea:focus, select:focus {
   gap: 6px;
   width: 100%;
   padding: 13px 18px;
-  border-radius: 10px;
+  border-radius: 999px;
   border: none;
   background: var(--brand);
   color: #fff;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   margin-top: 18px;
+  box-shadow: 0 3px 10px rgba(204, 93, 143, 0.28);
 }
 
 .btn:hover { background: var(--brand-dark); }
@@ -324,7 +386,10 @@ footer.tiny {
 }
 
 .admin-topbar h1 {
-  font-size: 1.25rem;
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.4rem;
   margin: 0;
 }
 
@@ -347,7 +412,7 @@ footer.tiny {
 
 .btn-small {
   padding: 9px 14px;
-  border-radius: 8px;
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: #fff;
   cursor: pointer;
@@ -550,7 +615,10 @@ footer.tiny {
 }
 
 .login-card h1 {
-  font-size: 1.2rem;
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.4rem;
   margin: 0 0 4px;
   text-align: center;
 }
