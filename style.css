@@ -494,6 +494,16 @@ footer.tiny {
   font-size: 0.87rem;
 }
 
+.move-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--brand-light);
+  margin: -2px 0 8px;
+}
+.move-panel label { margin-top: 0; }
+.move-panel .slots-grid { margin-top: 6px; }
+
 .employee-tag {
   display: inline-block;
   font-weight: 600;
