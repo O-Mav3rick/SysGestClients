@@ -10,6 +10,8 @@
   --danger: #c0402f;
   --danger-light: #fbeae7;
   --ok: #3f7d4f;
+  --warning: #e0932b;
+  --warning-dark: #c07a1c;
   --radius: 16px;
   --shadow: 0 4px 16px rgba(196, 90, 140, 0.12);
   --font-heading: "Playfair Display", Georgia, serif;
@@ -411,7 +413,11 @@ footer.tiny {
 }
 
 .btn-small {
-  padding: 9px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: #fff;
@@ -425,6 +431,8 @@ footer.tiny {
 .btn-small.primary:hover { background: var(--brand-dark); }
 .btn-small.danger { color: var(--danger); border-color: var(--danger-light); }
 .btn-small.danger:hover { background: var(--danger-light); }
+.btn-small.warning { background: var(--warning); border-color: var(--warning); color: #fff; }
+.btn-small.warning:hover { background: var(--warning-dark); border-color: var(--warning-dark); }
 
 .tabs {
   display: flex;
@@ -519,8 +527,11 @@ footer.tiny {
 }
 
 .badge {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
   font-size: 0.75rem;
-  padding: 3px 9px;
+  padding: 0 12px;
   border-radius: 999px;
   font-weight: 600;
 }
