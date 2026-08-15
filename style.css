@@ -12,6 +12,7 @@
   --ok: #3f7d4f;
   --warning: #e0932b;
   --warning-dark: #c07a1c;
+  --warning-light: #fbead2;
   --radius: 16px;
   --shadow: 0 4px 16px rgba(196, 90, 140, 0.12);
   --font-heading: "Playfair Display", Georgia, serif;
@@ -429,10 +430,10 @@ footer.tiny {
 .btn-small:hover { border-color: var(--brand); background: var(--brand-light); }
 .btn-small.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
 .btn-small.primary:hover { background: var(--brand-dark); }
-.btn-small.danger { color: var(--danger); border-color: var(--danger-light); }
-.btn-small.danger:hover { background: var(--danger-light); }
-.btn-small.warning { background: var(--warning); border-color: var(--warning); color: #fff; }
-.btn-small.warning:hover { background: var(--warning-dark); border-color: var(--warning-dark); }
+.btn-small.danger { background: var(--danger-light); color: var(--danger); border-color: var(--danger-light); }
+.btn-small.danger:hover { border-color: var(--danger); }
+.btn-small.warning { background: var(--warning-light); color: var(--warning-dark); border-color: var(--warning-light); }
+.btn-small.warning:hover { border-color: var(--warning); }
 
 .tabs {
   display: flex;
