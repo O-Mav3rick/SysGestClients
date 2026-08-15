@@ -24,7 +24,8 @@ const sb = createClient(
     myEmployee: null,
     employees: [],       // toute l'équipe (RLS: tout le monde voit les actif·ve·s)
     services: [],
-    apptView: 'list'
+    apptView: 'list',
+    apptsById: {}         // cache des rendez-vous affichés, utilisé par le panneau "Déplacer"
   };
 
   function escapeHtml(str) {
@@ -472,15 +473,22 @@ const sb = createClient(
   // Rendez-vous — helpers partagés entre la vue Liste et la vue Calendrier
   // ------------------------------------------------------------------
   function apptRowHTML(a) {
+    state.apptsById[a.id] = a;
     return `
-      <div class="appt-row">
-        <div class="time">${hhmm(a.start_time)} – ${hhmm(a.end_time)}</div>
-        <div class="info">
-          <div class="service">${escapeHtml(a.service_name)}${state.multiEmployee ? ` <span class="employee-tag">${escapeHtml(a.employee_name)}</span>` : ''}</div>
-          <div class="client">${escapeHtml(a.client_name)} · ${escapeHtml(a.client_phone)} · ${escapeHtml(a.client_email)}</div>
+      <div class="appt-row-wrap">
+        <div class="appt-row">
+          <div class="time">${hhmm(a.start_time)} – ${hhmm(a.end_time)}</div>
+          <div class="info">
+            <div class="service">${escapeHtml(a.service_name)}${state.multiEmployee ? ` <span class="employee-tag">${escapeHtml(a.employee_name)}</span>` : ''}</div>
+            <div class="client">${escapeHtml(a.client_name)} · ${escapeHtml(a.client_phone)} · ${escapeHtml(a.client_email)}</div>
+          </div>
+          <span class="badge ${a.status}">${a.status === 'cancelled' ? 'Annulé' : 'Confirmé'}</span>
+          ${a.status !== 'cancelled' ? `
+            <button class="btn-small" data-move="${a.id}">Déplacer</button>
+            <button class="btn-small danger" data-cancel="${a.id}">Annuler</button>
+          ` : ''}
         </div>
-        <span class="badge ${a.status}">${a.status === 'cancelled' ? 'Annulé' : 'Confirmé'}</span>
-        ${a.status !== 'cancelled' ? `<button class="btn-small danger" data-cancel="${a.id}">Annuler</button>` : ''}
+        ${a.status !== 'cancelled' ? `<div class="move-panel hidden" data-move-panel="${a.id}"></div>` : ''}
       </div>
     `;
   }
@@ -499,6 +507,103 @@ const sb = createClient(
         onCancelled();
       });
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Rendez-vous — déplacer (change la date/l'heure, courriel automatique
+  // "rendez-vous déplacé" envoyé par le déclencheur Postgres correspondant)
+  // ------------------------------------------------------------------
+  function wireMoveButtons(container, onMoved) {
+    container.querySelectorAll('[data-move]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.move;
+        const panel = container.querySelector(`[data-move-panel="${id}"]`);
+        if (!panel) return;
+        const wasOpen = !panel.classList.contains('hidden');
+        container.querySelectorAll('.move-panel').forEach((p) => p.classList.add('hidden'));
+        if (wasOpen) return;
+        panel.classList.remove('hidden');
+        renderMovePanel(panel, id, onMoved);
+      });
+    });
+  }
+
+  function renderMovePanel(panel, apptId, onMoved) {
+    const a = state.apptsById[apptId];
+    if (!a) {
+      panel.innerHTML = '<p class="empty-note">Rendez-vous introuvable — recharge la page.</p>';
+      return;
+    }
+
+    panel.innerHTML = `
+      <label>Nouvelle date</label>
+      <input type="date" class="move-date-input" value="${a.appt_date}" min="${todayISO()}" />
+      <div class="move-slots-wrap" style="margin-top:12px;">
+        <p class="empty-note move-slots-note">Chargement des disponibilités…</p>
+        <div class="slots-grid move-slots-grid"></div>
+      </div>
+      <button type="button" class="btn-small" data-move-close="${apptId}" style="margin-top:12px;">Fermer</button>
+    `;
+
+    const dateInput = panel.querySelector('.move-date-input');
+    const slotsGrid = panel.querySelector('.move-slots-grid');
+    const slotsNote = panel.querySelector('.move-slots-note');
+
+    panel.querySelector('[data-move-close]').addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
+
+    async function loadMoveSlots() {
+      const date = dateInput.value;
+      slotsGrid.innerHTML = '';
+      if (!date) {
+        slotsNote.textContent = 'Choisis une date pour voir les disponibilités.';
+        return;
+      }
+      slotsNote.textContent = 'Chargement…';
+      // p_exclude_appointment_id : ignore le rendez-vous qu'on est en train de
+      // déplacer dans le calcul des disponibilités, sinon son propre créneau
+      // (et la marge autour) semblerait "pris" par lui-même.
+      const { data: slots, error } = await sb.rpc('get_available_slots', {
+        p_service_id: a.service_id,
+        p_employee_id: a.employee_id,
+        p_date: date,
+        p_exclude_appointment_id: apptId
+      });
+      if (error) {
+        slotsNote.textContent = `Erreur : ${error.message}`;
+        return;
+      }
+      if (!slots || !slots.length) {
+        slotsNote.textContent = 'Aucune disponibilité ce jour-là.';
+        return;
+      }
+      slotsNote.textContent = '';
+      slotsGrid.innerHTML = slots
+        .map((s) => `<button type="button" class="slot-btn" data-start="${s.start_time}" data-end="${s.end_time}">${hhmm(s.start_time)}</button>`)
+        .join('');
+      slotsGrid.querySelectorAll('.slot-btn').forEach((slotBtn) => {
+        slotBtn.addEventListener('click', async () => {
+          const newStart = slotBtn.dataset.start;
+          const newEnd = slotBtn.dataset.end;
+          if (!confirm(`Déplacer le rendez-vous de ${a.client_name} au ${humanDate(date)} à ${hhmm(newStart)} ?`)) return;
+          slotsGrid.querySelectorAll('.slot-btn').forEach((b) => (b.disabled = true));
+          const { error: updErr } = await sb
+            .from('appointments')
+            .update({ appt_date: date, start_time: newStart, end_time: newEnd })
+            .eq('id', apptId);
+          if (updErr) {
+            alert(updErr.message);
+            slotsGrid.querySelectorAll('.slot-btn').forEach((b) => (b.disabled = false));
+            return;
+          }
+          onMoved();
+        });
+      });
+    }
+
+    dateInput.addEventListener('change', loadMoveSlots);
+    loadMoveSlots();
   }
 
   // ------------------------------------------------------------------
@@ -547,6 +652,7 @@ const sb = createClient(
     });
 
     wireCancelButtons(list, loadAppointments);
+    wireMoveButtons(list, loadAppointments);
   }
 
   // ------------------------------------------------------------------
@@ -684,6 +790,7 @@ const sb = createClient(
     }
     box.innerHTML = heading + appts.map(apptRowHTML).join('');
     wireCancelButtons(box, () => renderCalendar());
+    wireMoveButtons(box, () => renderCalendar());
   }
 
   // ------------------------------------------------------------------
