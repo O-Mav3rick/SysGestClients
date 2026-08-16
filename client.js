@@ -319,6 +319,13 @@ const sb = createClient(
       <div class="row"><span>Date</span><span>${humanDate(appt.appt_date)}</span></div>
       <div class="row"><span>Heure</span><span>${hhmm(appt.start_time)} – ${hhmm(appt.end_time)}</span></div>
     `;
+    const manageLink = el('manage-appt-link');
+    if (appt.manage_token) {
+      manageLink.href = `manage.html?token=${appt.manage_token}`;
+      manageLink.classList.remove('hidden');
+    } else {
+      manageLink.classList.add('hidden');
+    }
     btn.disabled = false;
     btn.textContent = 'Confirmer le rendez-vous';
     setStep('done');

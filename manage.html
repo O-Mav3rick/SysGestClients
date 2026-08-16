@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Gérer mon rendez-vous</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,600&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 id="biz-name">Gérer mon rendez-vous</h1>
+  </header>
+
+  <section id="manage-loading" class="card">
+    <p class="empty-note">Chargement…</p>
+  </section>
+
+  <section id="manage-error" class="card hidden">
+    <p class="empty-note" id="manage-error-text">Ce lien est invalide ou a expiré.</p>
+  </section>
+
+  <section id="manage-cancelled" class="card hidden">
+    <h2 class="section-title">Rendez-vous annulé</h2>
+    <p class="empty-note" style="padding-top:0;">Ce rendez-vous a déjà été annulé. Si tu veux reprendre un rendez-vous, retourne sur la page de réservation.</p>
+    <div class="recap" id="cancelled-recap"></div>
+  </section>
+
+  <section id="manage-main" class="card hidden">
+    <h2 class="section-title">Ton rendez-vous</h2>
+    <div class="recap" id="manage-recap"></div>
+
+    <div id="manage-error-box" class="alert hidden"></div>
+
+    <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+      <button class="btn secondary" id="manage-move-btn" style="width:auto; flex:1; margin-top:0;">Déplacer</button>
+      <button class="btn secondary" id="manage-cancel-btn" style="width:auto; flex:1; margin-top:0; color:var(--danger); border-color:var(--danger-light);">Annuler</button>
+    </div>
+
+    <div id="manage-move-panel" class="move-panel hidden" style="margin-top:16px;">
+      <label for="manage-date-input">Nouvelle date</label>
+      <input type="date" id="manage-date-input" />
+      <div style="margin-top:12px;">
+        <p class="empty-note" id="manage-slots-note">Choisis une date pour voir les disponibilités.</p>
+        <div class="slots-grid" id="manage-slots-grid"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="manage-done" class="card hidden">
+    <div class="success">
+      <div class="check">✓</div>
+      <h2 class="section-title" style="text-align:center;" id="manage-done-title">C'est fait !</h2>
+    </div>
+    <div class="recap" id="manage-done-recap"></div>
+  </section>
+
+  <footer class="tiny">Propulsé par ton propre système de rendez-vous</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="manage.js"></script>
+</body>
+</html>

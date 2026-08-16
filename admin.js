@@ -484,10 +484,12 @@ const sb = createClient(
           </div>
           <span class="badge ${a.status}">${a.status === 'cancelled' ? 'Annulé' : 'Confirmé'}</span>
           ${a.status !== 'cancelled' ? `
+            <button class="btn-small neutral" data-edit="${a.id}">Modifier</button>
             <button class="btn-small warning" data-move="${a.id}">Déplacer</button>
             <button class="btn-small danger" data-cancel="${a.id}">Annuler</button>
           ` : ''}
         </div>
+        ${a.status !== 'cancelled' ? `<div class="edit-panel hidden" data-edit-panel="${a.id}"></div>` : ''}
         ${a.status !== 'cancelled' ? `<div class="move-panel hidden" data-move-panel="${a.id}"></div>` : ''}
       </div>
     `;
@@ -520,7 +522,7 @@ const sb = createClient(
         const panel = container.querySelector(`[data-move-panel="${id}"]`);
         if (!panel) return;
         const wasOpen = !panel.classList.contains('hidden');
-        container.querySelectorAll('.move-panel').forEach((p) => p.classList.add('hidden'));
+        container.querySelectorAll('.move-panel, .edit-panel').forEach((p) => p.classList.add('hidden'));
         if (wasOpen) return;
         panel.classList.remove('hidden');
         renderMovePanel(panel, id, onMoved);
@@ -607,11 +609,143 @@ const sb = createClient(
   }
 
   // ------------------------------------------------------------------
+  // Rendez-vous — modifier les coordonnées de la cliente/du client
+  // (nom, téléphone, courriel) — ne touche pas à la date/l'heure.
+  // ------------------------------------------------------------------
+  function wireEditButtons(container, onSaved) {
+    container.querySelectorAll('[data-edit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.edit;
+        const panel = container.querySelector(`[data-edit-panel="${id}"]`);
+        if (!panel) return;
+        const wasOpen = !panel.classList.contains('hidden');
+        // Ferme aussi les panneaux "Déplacer" ouverts, pour éviter d'avoir
+        // deux panneaux ouverts en même temps sur la même rangée.
+        container.querySelectorAll('.edit-panel, .move-panel').forEach((p) => p.classList.add('hidden'));
+        if (wasOpen) return;
+        panel.classList.remove('hidden');
+        renderEditPanel(panel, id, onSaved);
+      });
+    });
+  }
+
+  function renderEditPanel(panel, apptId, onSaved) {
+    const a = state.apptsById[apptId];
+    if (!a) {
+      panel.innerHTML = '<p class="empty-note">Rendez-vous introuvable — recharge la page.</p>';
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="grid2">
+        <div>
+          <label>Nom complet</label>
+          <input type="text" class="edit-name-input" value="${escapeHtml(a.client_name)}" />
+        </div>
+        <div>
+          <label>Téléphone</label>
+          <input type="tel" class="edit-phone-input" value="${escapeHtml(a.client_phone)}" />
+        </div>
+      </div>
+      <label>Courriel</label>
+      <input type="email" class="edit-email-input" value="${escapeHtml(a.client_email)}" />
+      <div class="edit-panel-error alert hidden"></div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button type="button" class="btn-small primary" data-edit-save="${apptId}">Enregistrer</button>
+        <button type="button" class="btn-small" data-edit-close="${apptId}">Fermer</button>
+      </div>
+    `;
+
+    panel.querySelector('[data-edit-close]').addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
+
+    panel.querySelector('[data-edit-save]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const errBox = panel.querySelector('.edit-panel-error');
+      errBox.classList.add('hidden');
+
+      const client_name = panel.querySelector('.edit-name-input').value.trim();
+      const client_phone = panel.querySelector('.edit-phone-input').value.trim();
+      const client_email = panel.querySelector('.edit-email-input').value.trim();
+
+      if (!client_name || !client_phone || !client_email) {
+        errBox.textContent = 'Le nom, le téléphone et le courriel sont requis.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      const { error } = await sb.from('appointments').update({ client_name, client_phone, client_email }).eq('id', apptId);
+      btn.disabled = false;
+
+      if (error) {
+        errBox.textContent = error.message;
+        errBox.classList.remove('hidden');
+        return;
+      }
+      panel.classList.add('hidden');
+      onSaved();
+    });
+  }
+
+  // ------------------------------------------------------------------
   // Rendez-vous — vue Liste
   // ------------------------------------------------------------------
   el('show-all-toggle').addEventListener('change', loadAppointments);
 
+  // ------------------------------------------------------------------
+  // Rendez-vous — rangée d'aperçu (aujourd'hui / cette semaine / prochain)
+  // ------------------------------------------------------------------
+  function mondayOf(d) {
+    const day = d.getDay(); // 0=dim .. 6=sam
+    const diffToMonday = (day + 6) % 7;
+    const m = new Date(d);
+    m.setDate(d.getDate() - diffToMonday);
+    return m;
+  }
+
+  async function loadApptStats() {
+    const todayEl = el('stat-today');
+    const weekEl = el('stat-week');
+    const nextEl = el('stat-next');
+    if (!todayEl || !weekEl || !nextEl) return;
+
+    const today = todayISO();
+    const monday = mondayOf(new Date());
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const weekStart = isoFromDate(monday);
+    const weekEnd = isoFromDate(sunday);
+    const empFilter = el('employee-filter').value;
+
+    let qToday = sb.from('appointments').select('id', { count: 'exact', head: true }).eq('status', 'confirmed').eq('appt_date', today);
+    let qWeek = sb.from('appointments').select('id', { count: 'exact', head: true }).eq('status', 'confirmed').gte('appt_date', weekStart).lte('appt_date', weekEnd);
+    let qNext = sb.from('appointments').select('*').eq('status', 'confirmed').gte('appt_date', today)
+      .order('appt_date', { ascending: true }).order('start_time', { ascending: true }).limit(10);
+    if (empFilter) {
+      qToday = qToday.eq('employee_id', empFilter);
+      qWeek = qWeek.eq('employee_id', empFilter);
+      qNext = qNext.eq('employee_id', empFilter);
+    }
+
+    const [todayRes, weekRes, nextRes] = await Promise.all([qToday, qWeek, qNext]);
+
+    todayEl.textContent = todayRes.count ?? 0;
+    weekEl.textContent = weekRes.count ?? 0;
+
+    const nowHHMM = new Date().toTimeString().slice(0, 5);
+    const upcoming = (nextRes.data || []).find((a) => a.appt_date > today || (a.appt_date === today && a.start_time >= nowHHMM));
+    if (!upcoming) {
+      nextEl.textContent = 'Aucun à venir';
+    } else {
+      const when = upcoming.appt_date === today ? `Aujourd'hui ${hhmm(upcoming.start_time)}` : `${humanDate(upcoming.appt_date)} ${hhmm(upcoming.start_time)}`;
+      nextEl.textContent = `${when} — ${upcoming.client_name}${state.multiEmployee ? ` (${upcoming.employee_name})` : ''}`;
+    }
+  }
+
   async function loadAppointments() {
+    loadApptStats();
     const list = el('appointments-list');
     list.innerHTML = '<p class="empty-note">Chargement…</p>';
 
@@ -653,6 +787,7 @@ const sb = createClient(
 
     wireCancelButtons(list, loadAppointments);
     wireMoveButtons(list, loadAppointments);
+    wireEditButtons(list, loadAppointments);
   }
 
   // ------------------------------------------------------------------
@@ -712,6 +847,7 @@ const sb = createClient(
   });
 
   async function renderCalendar() {
+    loadApptStats();
     el('cal-month-label').textContent = calendarState.month.toLocaleDateString('fr-CA', { month: 'long', year: 'numeric' });
 
     const days = buildCalendarDays(calendarState.month);
@@ -791,6 +927,7 @@ const sb = createClient(
     box.innerHTML = heading + appts.map(apptRowHTML).join('');
     wireCancelButtons(box, () => renderCalendar());
     wireMoveButtons(box, () => renderCalendar());
+    wireEditButtons(box, () => renderCalendar());
   }
 
   // ------------------------------------------------------------------

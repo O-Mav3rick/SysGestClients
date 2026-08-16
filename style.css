@@ -295,6 +295,8 @@ input:focus, textarea:focus, select:focus {
   border: none;
   background: var(--brand);
   color: #fff;
+  text-decoration: none;
+  box-sizing: border-box;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -379,6 +381,46 @@ footer.tiny {
 /* Admin                                                                  */
 /* ---------------------------------------------------------------------- */
 
+.stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.stat-tile {
+  flex: 1;
+  min-width: 140px;
+  background: var(--brand-light);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.stat-tile-wide {
+  flex: 2;
+  min-width: 220px;
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  font-variant-numeric: proportional-nums;
+}
+
+.stat-value-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
 .admin-topbar {
   display: flex;
   flex-wrap: wrap;
@@ -434,6 +476,8 @@ footer.tiny {
 .btn-small.danger:hover { border-color: var(--danger); }
 .btn-small.warning { background: var(--warning-light); color: var(--warning-dark); border-color: var(--warning-light); }
 .btn-small.warning:hover { border-color: var(--warning); }
+.btn-small.neutral { background: var(--brand-light); color: var(--brand-dark); border-color: var(--brand-light); }
+.btn-small.neutral:hover { border-color: var(--brand); }
 
 .tabs {
   display: flex;
@@ -503,15 +547,16 @@ footer.tiny {
   font-size: 0.87rem;
 }
 
-.move-panel {
+.move-panel, .edit-panel {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   background: var(--brand-light);
   margin: -2px 0 8px;
 }
-.move-panel label { margin-top: 0; }
+.move-panel label, .edit-panel label { margin-top: 0; }
 .move-panel .slots-grid { margin-top: 6px; }
+.edit-panel .grid2 { margin-bottom: 0; }
 
 .employee-tag {
   display: inline-block;
