@@ -35,7 +35,14 @@ const sb = createClient(
     });
   }
 
-  function setStep(name) {
+  // Garde en mémoire quelle étape correspond à l'entrée courante de
+  // l'historique du navigateur, pour que le bouton "Retour" du navigateur
+  // recule d'une étape dans le parcours de réservation (employé·e → service
+  // → heure → coordonnées) au lieu de carrément quitter la page (ex. vers
+  // la page d'où le/la client·e est arrivé·e, comme /admin.html).
+  let stepInHistory = null;
+
+  function setStep(name, opts) {
     const idx = state.steps.indexOf(name);
     document.querySelectorAll('.steps .dot').forEach((d) => {
       d.classList.toggle('active', Number(d.dataset.step) <= idx + 1);
@@ -46,7 +53,29 @@ const sb = createClient(
     el('step-info').classList.toggle('hidden', name !== 'info');
     el('step-done').classList.toggle('hidden', name !== 'done');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // fromHistory: true = on répond à un popstate (Retour/Suivant du
+    // navigateur) : l'historique a déjà bougé, on ne fait qu'afficher.
+    if (opts && opts.fromHistory) {
+      stepInHistory = name;
+      return;
+    }
+    if (name === stepInHistory) return; // évite les doublons (setStep appelé 2x pour la même étape)
+    if (stepInHistory === null) {
+      // Toute première étape affichée après le chargement de la page : sert
+      // de point d'ancrage, sans créer de nouvelle entrée — reculer depuis
+      // ici doit normalement quitter la page, pas rester coincé dessus.
+      history.replaceState({ step: name }, '', location.href);
+    } else {
+      history.pushState({ step: name }, '', location.href);
+    }
+    stepInHistory = name;
   }
+
+  window.addEventListener('popstate', (e) => {
+    const step = e.state && e.state.step;
+    if (step) setStep(step, { fromHistory: true });
+  });
 
   function money(cents) {
     if (cents === null || cents === undefined) return '';
@@ -385,7 +414,7 @@ const sb = createClient(
         btn.disabled = false;
         btn.textContent = 'Confirmer le rendez-vous';
         setTimeout(() => {
-          setStep('time');
+          history.back(); // revient à l'étape "heure" déjà présente dans l'historique
           loadSlots();
         }, 1500);
         return;
@@ -451,11 +480,13 @@ const sb = createClient(
   });
 
   document.querySelectorAll('[data-back]').forEach((btn) => {
+    // Chaque lien "← Changer..." correspond exactement à l'étape précédente
+    // dans l'historique (employé·e → service → heure sont poussées une par
+    // une) — on utilise donc l'historique du navigateur plutôt qu'un
+    // setStep() direct, pour que ce bouton et le "Retour" du navigateur
+    // restent parfaitement synchronisés.
     btn.addEventListener('click', () => {
-      const target = btn.dataset.back;
-      if (target === 'employee') setStep('employee');
-      if (target === 'service') setStep('service');
-      if (target === 'time') setStep('time');
+      history.back();
     });
   });
 
