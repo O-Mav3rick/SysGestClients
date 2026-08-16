@@ -274,6 +274,22 @@
       <div id="my-name-note" class="save-note"></div>
       <button class="btn-small primary" id="save-my-name-btn">Enregistrer</button>
     </div>
+
+    <div class="card">
+      <h2 class="section-title">Ma photo de profil</h2>
+      <div class="photo-widget">
+        <div id="my-photo-avatar"></div>
+        <div class="photo-actions">
+          <button type="button" class="btn-small neutral" id="my-photo-trigger">Changer la photo</button>
+          <button type="button" class="btn-small danger hidden" id="my-photo-remove">Retirer la photo</button>
+          <input type="file" accept="image/png,image/jpeg,image/webp" id="my-photo-input" style="display:none" />
+          <span class="save-note" id="my-photo-note"></span>
+        </div>
+      </div>
+      <p class="empty-note" style="padding-top:0;">
+        Visible pour les client·e·s à l'étape "Choisis ta ou ton spécialiste" (si vous êtes plus d'une personne dans l'équipe) et dans l'onglet Équipe.
+      </p>
+    </div>
   </div>
 </div>
 

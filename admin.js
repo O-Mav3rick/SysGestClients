@@ -364,6 +364,7 @@ const sb = createClient(
 
     if (state.myEmployee) {
       el('my-name-input').value = state.myEmployee.full_name || '';
+      renderMyPhoto();
     }
 
     if (state.isOwner) {
@@ -416,20 +417,19 @@ const sb = createClient(
 
       if (emp.role === 'owner') {
         row.innerHTML = `
-          ${photoWidgetHTML(emp)}
           <div class="grid2">
             <div><label>Nom</label><input type="text" value="${escapeHtml(emp.full_name)}" disabled /></div>
             <div><label>Courriel</label><input type="email" value="${escapeHtml(emp.email)}" disabled /></div>
           </div>
-          <p class="empty-note" style="padding-top:0;">Propriétaire — gère les services, l'horaire général et l'équipe. Modifie son propre nom dans l'onglet Compte.</p>
+          <p class="empty-note" style="padding-top:0;">Propriétaire — gère les services, l'horaire général et l'équipe. Modifie son propre nom et sa propre photo dans l'onglet Compte.</p>
         `;
         list.appendChild(row);
-        wirePhotoWidget(row, emp);
         return;
       }
 
       row.innerHTML = `
         ${photoWidgetHTML(emp)}
+        <p class="empty-note" style="padding-top:0;">Une photo mise ici est visible pour la cliente/le client ; ${escapeHtml(emp.full_name.split(' ')[0])} peut aussi la changer elle-même/lui-même depuis son propre onglet Compte une fois connecté(e).</p>
         <div class="grid2">
           <div>
             <label>Nom</label>
@@ -1382,6 +1382,55 @@ const sb = createClient(
     note.textContent = 'Nom mis à jour.';
     setTimeout(() => (note.textContent = ''), 2000);
     loadTeamAndRole();
+  });
+
+  // ------------------------------------------------------------------
+  // Ma photo (onglet Compte) — chacun·e (propriétaire ou employé(e))
+  // change SA PROPRE photo ici. Le/la propriétaire peut en plus changer
+  // celle de n'importe qui depuis l'onglet Équipe.
+  // ------------------------------------------------------------------
+  function renderMyPhoto() {
+    if (!state.myEmployee) return;
+    el('my-photo-avatar').innerHTML = avatarHTML(state.myEmployee, 'lg');
+    el('my-photo-remove').classList.toggle('hidden', !state.myEmployee.photo_url);
+  }
+
+  el('my-photo-trigger').addEventListener('click', () => el('my-photo-input').click());
+
+  el('my-photo-input').addEventListener('change', async () => {
+    const input = el('my-photo-input');
+    const note = el('my-photo-note');
+    const file = input.files[0];
+    input.value = '';
+    if (!file || !state.myEmployee) return;
+    note.textContent = 'Téléversement…';
+    try {
+      const url = await uploadEmployeePhoto(file, state.myEmployee.id);
+      const { error } = await sb.rpc('update_my_employee_profile', {
+        p_full_name: null, p_phone: null, p_hours: null, p_photo_url: url, p_clear_photo: false
+      });
+      if (error) throw error;
+      state.myEmployee.photo_url = url;
+      renderMyPhoto();
+      note.textContent = 'Photo mise à jour.';
+      setTimeout(() => (note.textContent = ''), 2000);
+    } catch (err) {
+      note.textContent = err.message || 'Erreur lors du téléversement.';
+    }
+  });
+
+  el('my-photo-remove').addEventListener('click', async () => {
+    if (!state.myEmployee) return;
+    if (!confirm('Retirer ta photo ?')) return;
+    const { error } = await sb.rpc('update_my_employee_profile', {
+      p_full_name: null, p_phone: null, p_hours: null, p_photo_url: null, p_clear_photo: true
+    });
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    state.myEmployee.photo_url = null;
+    renderMyPhoto();
   });
 
   // ------------------------------------------------------------------
