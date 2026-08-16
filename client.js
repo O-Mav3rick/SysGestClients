@@ -76,6 +76,21 @@ const sb = createClient(
     return d.innerHTML;
   }
 
+  function initials(name) {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    const first = parts[0][0] || '';
+    const second = parts.length > 1 ? parts[1][0] : '';
+    return (first + second).toUpperCase();
+  }
+
+  function avatarHTML(emp) {
+    if (emp.photo_url) {
+      return `<img class="avatar" src="${escapeHtml(emp.photo_url)}" alt="" />`;
+    }
+    return `<div class="avatar">${escapeHtml(initials(emp.full_name))}</div>`;
+  }
+
   // Enlève les secondes que Postgres ajoute aux "time" (ex. "10:00:00" -> "10:00")
   function hhmm(t) {
     return t ? t.slice(0, 5) : t;
@@ -105,7 +120,7 @@ const sb = createClient(
     const wrap = el('employee-list');
     const { data, error } = await sb
       .from('employees')
-      .select('id, full_name')
+      .select('id, full_name, photo_url')
       .eq('active', true)
       .order('full_name', { ascending: true });
 
@@ -137,7 +152,7 @@ const sb = createClient(
       const btn = document.createElement('button');
       btn.className = 'service-card';
       btn.type = 'button';
-      btn.innerHTML = `<div><div class="name">${escapeHtml(emp.full_name)}</div></div><div class="chevron">&rarr;</div>`;
+      btn.innerHTML = `${avatarHTML(emp)}<div><div class="name">${escapeHtml(emp.full_name)}</div></div><div class="chevron">&rarr;</div>`;
       btn.addEventListener('click', () => selectEmployee(emp));
       wrap.appendChild(btn);
     });

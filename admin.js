@@ -55,6 +55,102 @@ const sb = createClient(
   }
 
   // ------------------------------------------------------------------
+  // Photo de profil (avatar) — photo si dispo, sinon initiales du nom.
+  // Gérée uniquement par le/la propriétaire, depuis l'onglet Équipe.
+  // ------------------------------------------------------------------
+  const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+  const PHOTO_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+  function initials(name) {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    const first = parts[0][0] || '';
+    const second = parts.length > 1 ? parts[1][0] : '';
+    return (first + second).toUpperCase();
+  }
+
+  function avatarHTML(emp, size) {
+    const cls = `avatar${size ? ' avatar-' + size : ''}`;
+    if (emp.photo_url) {
+      return `<img class="${cls}" src="${escapeHtml(emp.photo_url)}" alt="" />`;
+    }
+    return `<div class="${cls}">${escapeHtml(initials(emp.full_name))}</div>`;
+  }
+
+  async function uploadEmployeePhoto(file, employeeId) {
+    if (!PHOTO_ALLOWED_TYPES.includes(file.type)) {
+      throw new Error('Format non supporté — utilise une image JPG, PNG ou WebP.');
+    }
+    if (file.size > PHOTO_MAX_BYTES) {
+      throw new Error('Image trop grande (max 5 Mo).');
+    }
+    const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `${employeeId}/${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('employee-photos').upload(path, file, {
+      cacheControl: '3600',
+      upsert: true
+    });
+    if (upErr) throw upErr;
+    const { data } = sb.storage.from('employee-photos').getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  function photoWidgetHTML(emp) {
+    return `
+      <div class="photo-widget">
+        <div data-avatar="${emp.id}">${avatarHTML(emp, 'lg')}</div>
+        <div class="photo-actions">
+          <button type="button" class="btn-small neutral" data-photo-trigger>Changer la photo</button>
+          <button type="button" class="btn-small danger ${emp.photo_url ? '' : 'hidden'}" data-photo-remove>Retirer la photo</button>
+          <input type="file" accept="image/png,image/jpeg,image/webp" data-photo-input style="display:none" />
+          <span class="save-note" data-photo-note></span>
+        </div>
+      </div>
+    `;
+  }
+
+  function wirePhotoWidget(row, emp) {
+    const input = row.querySelector('[data-photo-input]');
+    const avatarWrap = row.querySelector('[data-avatar]');
+    const note = row.querySelector('[data-photo-note]');
+    const removeBtn = row.querySelector('[data-photo-remove]');
+    const triggerBtn = row.querySelector('[data-photo-trigger]');
+
+    triggerBtn.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      input.value = '';
+      if (!file) return;
+      note.textContent = 'Téléversement…';
+      try {
+        const url = await uploadEmployeePhoto(file, emp.id);
+        const { error } = await sb.from('employees').update({ photo_url: url }).eq('id', emp.id);
+        if (error) throw error;
+        emp.photo_url = url;
+        avatarWrap.innerHTML = avatarHTML(emp, 'lg');
+        removeBtn.classList.remove('hidden');
+        note.textContent = 'Photo mise à jour.';
+        setTimeout(() => (note.textContent = ''), 2000);
+      } catch (err) {
+        note.textContent = err.message || 'Erreur lors du téléversement.';
+      }
+    });
+
+    removeBtn.addEventListener('click', async () => {
+      if (!confirm('Retirer la photo ?')) return;
+      const { error } = await sb.from('employees').update({ photo_url: null }).eq('id', emp.id);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      emp.photo_url = null;
+      avatarWrap.innerHTML = avatarHTML(emp, 'lg');
+      removeBtn.classList.add('hidden');
+    });
+  }
+
+  // ------------------------------------------------------------------
   // Heures (jsonb {mon:{closed,open,close}, ...}) — utilisé pour l'horaire
   // général du commerce, "Mon horaire" et l'horaire de chaque employé(e)
   // dans l'onglet Équipe.
@@ -320,6 +416,7 @@ const sb = createClient(
 
       if (emp.role === 'owner') {
         row.innerHTML = `
+          ${photoWidgetHTML(emp)}
           <div class="grid2">
             <div><label>Nom</label><input type="text" value="${escapeHtml(emp.full_name)}" disabled /></div>
             <div><label>Courriel</label><input type="email" value="${escapeHtml(emp.email)}" disabled /></div>
@@ -327,10 +424,12 @@ const sb = createClient(
           <p class="empty-note" style="padding-top:0;">Propriétaire — gère les services, l'horaire général et l'équipe. Modifie son propre nom dans l'onglet Compte.</p>
         `;
         list.appendChild(row);
+        wirePhotoWidget(row, emp);
         return;
       }
 
       row.innerHTML = `
+        ${photoWidgetHTML(emp)}
         <div class="grid2">
           <div>
             <label>Nom</label>
@@ -357,6 +456,7 @@ const sb = createClient(
         </div>
       `;
       list.appendChild(row);
+      wirePhotoWidget(row, emp);
 
       const svcWrap = row.querySelector('[data-services]');
       if (state.services.length) {
