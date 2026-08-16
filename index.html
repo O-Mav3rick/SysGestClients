@@ -29,13 +29,21 @@
     </div>
   </section>
 
-  <!-- Étape 1 : choix du service -->
+  <!-- Étape 1 : choix du/des service(s) -->
   <section id="step-service" class="card hidden">
     <button class="back-link hidden" data-back="employee">&larr; Changer de spécialiste</button>
-    <h2 class="section-title" id="service-title">Choisis ton service</h2>
+    <h2 class="section-title" id="service-title">Choisis un ou plusieurs services</h2>
+    <p class="empty-note" style="padding-top:0;">Tu peux prendre plusieurs services à la suite (ex. coupe + couleur) — ils seront réservés l'un après l'autre, au même rendez-vous.</p>
     <div id="service-list" class="service-list">
       <p class="empty-note">Chargement des services…</p>
     </div>
+    <div id="service-summary" class="service-summary hidden">
+      <div class="service-summary-total">
+        <span id="service-summary-count"></span>
+        <span id="service-summary-price"></span>
+      </div>
+    </div>
+    <button class="btn hidden" id="services-continue-btn">Continuer</button>
   </section>
 
   <!-- Étape 2 : choix de la date et de l'heure -->
@@ -80,8 +88,8 @@
       <h2 class="section-title" style="text-align:center;">Rendez-vous confirmé !</h2>
     </div>
     <div class="recap" id="done-recap"></div>
-    <a href="#" class="btn hidden" id="manage-appt-link">Gérer mon rendez-vous</a>
-    <p class="empty-note" style="text-align:center;">Un courriel de confirmation avec ce même lien t'a aussi été envoyé — garde-le pour annuler ou déplacer plus tard.</p>
+    <div id="manage-appt-links"></div>
+    <p class="empty-note" style="text-align:center;">Un courriel de confirmation avec ce(s) même(s) lien(s) t'a aussi été envoyé — garde-le pour annuler ou déplacer plus tard.</p>
     <button class="btn secondary" id="new-appt-btn">Prendre un autre rendez-vous</button>
   </section>
 

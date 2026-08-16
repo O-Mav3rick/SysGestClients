@@ -200,6 +200,75 @@ h2.section-title {
   white-space: nowrap;
 }
 
+/* Case à cocher visuelle sur les .service-card sélectionnables en
+   multiple (choix de services à la page client) */
+.service-card .check-indicator {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.service-card.selected {
+  border-color: var(--brand);
+  background: var(--brand-light);
+}
+
+.service-card.selected .check-indicator {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.service-card.selected .check-indicator::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 6px;
+  height: 10px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* Résumé du/des service(s) sélectionné(s) (page client, étape service) */
+.service-summary {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--brand-light);
+  border-radius: 12px;
+}
+
+.service-summary-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--brand-dark);
+}
+
+/* Liens "Gérer" par service, sur l'écran de confirmation d'une visite
+   multi-services (chaque service reste géré individuellement) */
+.manage-links-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.manage-link-item {
+  width: auto;
+  flex: 1 1 auto;
+  margin-top: 0;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
 /* Avatar : photo de profil (ou initiales si aucune photo) */
 .avatar {
   width: 40px;
@@ -583,6 +652,13 @@ footer.tiny {
 .appt-row .info .client {
   color: var(--ink-soft);
   font-size: 0.87rem;
+}
+
+.group-note {
+  color: var(--brand-dark);
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-top: 2px;
 }
 
 .move-panel, .edit-panel {

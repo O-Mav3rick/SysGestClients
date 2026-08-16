@@ -574,14 +574,26 @@ const sb = createClient(
   // ------------------------------------------------------------------
   // Rendez-vous — helpers partagés entre la vue Liste et la vue Calendrier
   // ------------------------------------------------------------------
-  function apptRowHTML(a) {
+  // Le 2e/3e argument (idx, arr) vient gratuitement de .map(apptRowHTML) —
+  // "arr" est la liste (du même jour) en cours d'affichage, utilisée ici
+  // pour repérer les AUTRES rendez-vous de la même visite multi-services
+  // (booking_group_id partagé) et les indiquer visuellement.
+  function apptRowHTML(a, _idx, arr) {
     state.apptsById[a.id] = a;
+    let groupNote = '';
+    if (a.booking_group_id && arr) {
+      const siblings = arr.filter((x) => x.booking_group_id === a.booking_group_id && x.id !== a.id);
+      if (siblings.length) {
+        groupNote = `<div class="group-note">Même visite : ${siblings.map((s) => escapeHtml(s.service_name)).join(', ')}</div>`;
+      }
+    }
     return `
       <div class="appt-row-wrap">
         <div class="appt-row">
           <div class="time">${hhmm(a.start_time)} – ${hhmm(a.end_time)}</div>
           <div class="info">
             <div class="service">${escapeHtml(a.service_name)}${state.multiEmployee ? ` <span class="employee-tag">${escapeHtml(a.employee_name)}</span>` : ''}</div>
+            ${groupNote}
             <div class="client">${escapeHtml(a.client_name)} · ${escapeHtml(a.client_phone)} · ${escapeHtml(a.client_email)}</div>
           </div>
           <span class="badge ${a.status}">${a.status === 'cancelled' ? 'Annulé' : 'Confirmé'}</span>
@@ -600,7 +612,9 @@ const sb = createClient(
   function wireCancelButtons(container, onCancelled) {
     container.querySelectorAll('[data-cancel]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Annuler ce rendez-vous ?')) return;
+        const a = state.apptsById[btn.dataset.cancel];
+        const groupNote = a && a.booking_group_id ? ' (les autres services de cette visite ne seront pas touchés)' : '';
+        if (!confirm(`Annuler ce rendez-vous ?${groupNote}`)) return;
         btn.disabled = true;
         const { error } = await sb.from('appointments').update({ status: 'cancelled' }).eq('id', btn.dataset.cancel);
         if (error) {
