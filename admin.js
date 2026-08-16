@@ -324,15 +324,47 @@ const sb = createClient(
   // ------------------------------------------------------------------
   // Onglets
   // ------------------------------------------------------------------
+  // Chaque changement d'onglet crée sa propre entrée dans l'historique du
+  // navigateur, pour que le bouton "Retour" revienne à l'onglet précédent
+  // au lieu de carrément quitter /admin.html (même bug/correctif que sur
+  // la page client — voir client.js).
+  let tabInHistory = null;
+
+  function activateTab(tabName, opts) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+    if (!btn || btn.classList.contains('hidden')) return;
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach((p) => p.classList.add('hidden'));
+    btn.classList.add('active');
+    el(`tab-${tabName}`).classList.remove('hidden');
+
+    if (opts && opts.fromHistory) {
+      tabInHistory = tabName;
+      return;
+    }
+    if (tabName === tabInHistory) return; // déjà l'onglet actif, rien à ajouter à l'historique
+    if (tabInHistory === null) {
+      // Tout premier onglet affiché après le chargement de la page : sert
+      // de point d'ancrage, sans créer de nouvelle entrée.
+      history.replaceState({ tab: tabName }, '', location.href);
+    } else {
+      history.pushState({ tab: tabName }, '', location.href);
+    }
+    tabInHistory = tabName;
+  }
+
   document.querySelectorAll('.tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (btn.classList.contains('hidden')) return;
-      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach((p) => p.classList.add('hidden'));
-      btn.classList.add('active');
-      el(`tab-${btn.dataset.tab}`).classList.remove('hidden');
-    });
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
+
+  window.addEventListener('popstate', (e) => {
+    if (e.state && e.state.tab) activateTab(e.state.tab, { fromHistory: true });
+  });
+
+  // Ancre l'onglet affiché par défaut au chargement ("Rendez-vous") dans
+  // l'historique, pour que le tout premier "Retour" quitte normalement la
+  // page plutôt que de rester coincé dessus.
+  activateTab('appointments');
 
   // ------------------------------------------------------------------
   // Équipe + rôle (propriétaire vs employé(e))
