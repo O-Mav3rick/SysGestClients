@@ -173,6 +173,27 @@
         <div id="hours-save-note" class="save-note"></div>
         <button class="btn" id="save-hours-btn">Enregistrer l'horaire</button>
       </div>
+
+      <div class="card">
+        <h2 class="section-title">Jours fériés / fermetures</h2>
+        <p class="empty-note" style="padding-top:0;">
+          Ajoute une date précise (Noël, jour de l'An, fête nationale, vacances…) où c'est fermé,
+          en plus de l'horaire hebdomadaire habituel. Personne ne pourra réserver ce jour-là.
+        </p>
+        <div class="grid2">
+          <div>
+            <label for="new-closed-date">Date</label>
+            <input type="date" id="new-closed-date" />
+          </div>
+          <div>
+            <label for="new-closed-label">Raison (optionnel)</label>
+            <input type="text" id="new-closed-label" placeholder="Ex. Noël" />
+          </div>
+        </div>
+        <div id="closed-date-warning" class="alert hidden"></div>
+        <button class="btn-small primary" id="add-closed-date-btn" style="margin-top:10px;">Ajouter</button>
+        <div id="closed-dates-list" style="margin-top:16px;"></div>
+      </div>
     </div>
 
     <div class="card hidden" id="hours-mine-card">

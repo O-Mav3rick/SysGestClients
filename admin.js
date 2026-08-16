@@ -932,6 +932,7 @@ const sb = createClient(
     el('setting-advance').value = s.max_advance_days;
 
     buildHoursRows(el('hours-list'), s.business_hours);
+    if (state.isOwner) loadClosedDates();
   }
 
   el('save-hours-btn').addEventListener('click', async () => {
@@ -972,6 +973,99 @@ const sb = createClient(
     note.textContent = 'Réglages enregistrés.';
     loadBusinessName();
     setTimeout(() => (note.textContent = ''), 2500);
+  });
+
+  // ------------------------------------------------------------------
+  // Jours fériés / fermetures ponctuelles (propriétaire)
+  // ------------------------------------------------------------------
+  async function loadClosedDates() {
+    const list = el('closed-dates-list');
+    if (!list) return;
+    list.innerHTML = '<p class="empty-note">Chargement…</p>';
+
+    const { data: rows, error } = await sb
+      .from('closed_dates')
+      .select('*')
+      .gte('closed_date', todayISO())
+      .order('closed_date', { ascending: true });
+
+    if (error) {
+      list.innerHTML = `<p class="empty-note">Erreur : ${escapeHtml(error.message)}</p>`;
+      return;
+    }
+    if (!rows.length) {
+      list.innerHTML = '<p class="empty-note">Aucune fermeture programmée.</p>';
+      return;
+    }
+
+    list.innerHTML = rows.map((r) => `
+      <div class="day-row" data-closed-row="${r.closed_date}">
+        <div class="day-name" style="width:auto; min-width:140px;">${humanDate(r.closed_date)}</div>
+        <div style="flex:1; color:var(--ink-soft); font-size:0.9rem;">${r.label ? escapeHtml(r.label) : ''}</div>
+        <button class="btn-small danger" data-remove-closed="${r.closed_date}">Retirer</button>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('[data-remove-closed]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Retirer cette fermeture ? Le jour redevient réservable selon l\'horaire habituel.')) return;
+        btn.disabled = true;
+        const { error: delErr } = await sb.from('closed_dates').delete().eq('closed_date', btn.dataset.removeClosed);
+        if (delErr) {
+          alert(delErr.message);
+          btn.disabled = false;
+          return;
+        }
+        loadClosedDates();
+      });
+    });
+  }
+
+  el('add-closed-date-btn').addEventListener('click', async () => {
+    const dateInput = el('new-closed-date');
+    const labelInput = el('new-closed-label');
+    const warningBox = el('closed-date-warning');
+    warningBox.classList.add('hidden');
+
+    const date = dateInput.value;
+    if (!date) {
+      alert('Choisis une date.');
+      return;
+    }
+
+    const btn = el('add-closed-date-btn');
+    btn.disabled = true;
+
+    const { error } = await sb.from('closed_dates').insert({
+      closed_date: date,
+      label: labelInput.value.trim() || null
+    });
+
+    if (error) {
+      btn.disabled = false;
+      alert(error.code === '23505' ? 'Cette date est déjà marquée comme fermée.' : error.message);
+      return;
+    }
+
+    // Avertit si des rendez-vous confirmés existent déjà ce jour-là — la
+    // fermeture n'annule rien automatiquement, il faut les déplacer/annuler
+    // soi-même (onglet Rendez-vous) si besoin.
+    const { count } = await sb
+      .from('appointments')
+      .select('id', { count: 'exact', head: true })
+      .eq('appt_date', date)
+      .eq('status', 'confirmed');
+
+    btn.disabled = false;
+    dateInput.value = '';
+    labelInput.value = '';
+
+    if (count && count > 0) {
+      warningBox.textContent = `Attention : ${count} rendez-vous ${count > 1 ? 'sont' : 'est'} déjà confirmé${count > 1 ? 's' : ''} ce jour-là. La fermeture n'annule rien automatiquement — utilise Déplacer ou Annuler dans l'onglet Rendez-vous au besoin.`;
+      warningBox.classList.remove('hidden');
+    }
+
+    loadClosedDates();
   });
 
   // ------------------------------------------------------------------
