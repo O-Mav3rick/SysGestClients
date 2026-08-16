@@ -1174,6 +1174,39 @@ const sb = createClient(
     if (state.isOwner) loadClosedDates();
   }
 
+  el('save-settings-btn').addEventListener('click', async () => {
+    const btn = el('save-settings-btn');
+    const note = el('settings-save-note');
+    const bizName = el('setting-biz-name').value.trim();
+
+    if (!bizName) {
+      alert('Le nom de la business ne peut pas être vide.');
+      return;
+    }
+
+    btn.disabled = true;
+
+    const { error } = await sb.from('business_settings').update({
+      business_name: bizName,
+      timezone: el('setting-timezone').value.trim(),
+      slot_interval_minutes: Number(el('setting-interval').value) || 15,
+      buffer_minutes: Number(el('setting-buffer').value) || 0,
+      min_notice_hours: Number(el('setting-notice').value) || 0,
+      max_advance_days: Number(el('setting-advance').value) || 30
+    }).eq('id', true);
+
+    btn.disabled = false;
+
+    if (error) {
+      note.textContent = '';
+      alert(error.message);
+      return;
+    }
+    note.textContent = 'Réglages enregistrés.';
+    loadBusinessName();
+    setTimeout(() => (note.textContent = ''), 2500);
+  });
+
   el('save-hours-btn').addEventListener('click', async () => {
     const btn = el('save-hours-btn');
     const note = el('hours-save-note');
@@ -1181,15 +1214,7 @@ const sb = createClient(
 
     const business_hours = readHoursRows(el('hours-list'));
 
-    const { error } = await sb.from('business_settings').update({
-      business_name: el('setting-biz-name').value.trim(),
-      timezone: el('setting-timezone').value.trim(),
-      slot_interval_minutes: Number(el('setting-interval').value) || 15,
-      buffer_minutes: Number(el('setting-buffer').value) || 0,
-      min_notice_hours: Number(el('setting-notice').value) || 0,
-      max_advance_days: Number(el('setting-advance').value) || 30,
-      business_hours
-    }).eq('id', true);
+    const { error } = await sb.from('business_settings').update({ business_hours }).eq('id', true);
 
     if (!error) {
       // Tant qu'il n'y a pas d'équipe, l'horaire général EST l'horaire du/de
@@ -1209,8 +1234,7 @@ const sb = createClient(
       alert(error.message);
       return;
     }
-    note.textContent = 'Réglages enregistrés.';
-    loadBusinessName();
+    note.textContent = 'Horaire enregistré.';
     setTimeout(() => (note.textContent = ''), 2500);
   });
 
