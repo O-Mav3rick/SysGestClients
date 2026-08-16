@@ -371,6 +371,7 @@ const sb = createClient(
       renderTeamList();
     } else if (state.myEmployee) {
       buildHoursRows(el('hours-mine-list'), state.myEmployee.hours);
+      renderMyServices();
     }
   }
 
@@ -379,6 +380,7 @@ const sb = createClient(
     el('tab-btn-team').classList.toggle('hidden', !state.isOwner);
     el('hours-owner-section').classList.toggle('hidden', !state.isOwner);
     el('hours-mine-card').classList.toggle('hidden', state.isOwner);
+    el('my-services-card').classList.toggle('hidden', state.isOwner);
 
     // Si l'onglet actif vient d'être caché (ex. reconnexion sous un autre
     // rôle), retombe sur Rendez-vous.
@@ -1431,6 +1433,59 @@ const sb = createClient(
     }
     state.myEmployee.photo_url = null;
     renderMyPhoto();
+  });
+
+  // ------------------------------------------------------------------
+  // Mes services offerts (onglet Compte) — un(e) employé(e) coche
+  // elle-même quels services (parmi le catalogue existant) elle offre.
+  // Le catalogue lui-même (créer/modifier un service) reste réservé
+  // au/à la propriétaire, dans l'onglet Services.
+  // ------------------------------------------------------------------
+  function renderMyServices() {
+    const wrap = el('my-services-list');
+    if (!state.myEmployee) return;
+    if (!state.services.length) {
+      wrap.innerHTML = '<p class="empty-note">Aucun service actif pour le moment — demande à la/le propriétaire d\'en ajouter dans l\'onglet Services.</p>';
+      return;
+    }
+    wrap.innerHTML = state.services.map((s) => `
+      <label class="checkbox-line svc-check">
+        <input type="checkbox" class="my-svc" value="${s.id}" ${state.myEmployee.serviceIds?.has(s.id) ? 'checked' : ''} />
+        ${escapeHtml(s.name)}
+      </label>
+    `).join('');
+  }
+
+  el('save-my-services-btn').addEventListener('click', async () => {
+    if (!state.myEmployee) return;
+    const btn = el('save-my-services-btn');
+    const note = el('my-services-note');
+    btn.disabled = true;
+    note.textContent = '';
+
+    const selectedIds = Array.from(el('my-services-list').querySelectorAll('.my-svc:checked')).map((cb) => cb.value);
+
+    const { error: delErr } = await sb.from('employee_services').delete().eq('employee_id', state.myEmployee.id);
+    if (delErr) {
+      btn.disabled = false;
+      alert(delErr.message);
+      return;
+    }
+    if (selectedIds.length) {
+      const { error: insErr } = await sb.from('employee_services').insert(
+        selectedIds.map((sid) => ({ employee_id: state.myEmployee.id, service_id: sid }))
+      );
+      if (insErr) {
+        btn.disabled = false;
+        alert(insErr.message);
+        return;
+      }
+    }
+
+    btn.disabled = false;
+    note.textContent = 'Enregistré !';
+    setTimeout(() => (note.textContent = ''), 2000);
+    loadTeamAndRole();
   });
 
   // ------------------------------------------------------------------
